@@ -112,7 +112,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Helper function to create save callback for config_entry
         def make_save_callback(config_key: str):
             async def save_to_config(_entity: Any, value: Any) -> None:
-                data = self.config_entry.data | {config_key: value}
+                # Convert to proper type (float for prices, int for others)
+                if config_key == CONF_CALIB_PRICE_THRESHOLD:
+                    typed_value = float(value)
+                else:
+                    typed_value = int(value)
+                data = self.config_entry.data | {config_key: typed_value}
                 self.hass.config_entries.async_update_entry(self.config_entry, data=data)
                 # Update status display
                 self._update_calibration_status()
