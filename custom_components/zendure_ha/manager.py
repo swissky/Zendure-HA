@@ -25,6 +25,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.loader import async_get_integration
 
 from .api import Api
+from .button import ZendureButton
 from .const import CONF_P1METER, DOMAIN, DeviceState, SmartMode
 from .device import DeviceSettings, ZendureDevice, ZendureLegacy
 from .entity import EntityDevice
