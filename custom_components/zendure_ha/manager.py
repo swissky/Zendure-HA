@@ -135,6 +135,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             self._update_calibration_status()
         self.calib01_enabled = ZendureSwitch(self, "calib01_enabled", save_enabled, None, None, saved_enabled)
+        self.calib01_enabled._attr_entity_category = EntityCategory.CONFIG
         
         # Select: Mode (all_together / individual)
         mode_dict = {0: "all_together", 1: "individual"}
@@ -145,58 +146,65 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             data = self.config_entry.data | {CONF_CALIB_MODE: mode_str}
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
         self.calib02_mode = ZendureRestoreSelect(self, "calib02_mode", mode_dict, save_mode, mode_current)
+        self.calib02_mode._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Interval (days)
         self.calib03_interval = ZendureNumber(
             self, "calib03_interval", make_save_callback(CONF_CALIB_INTERVAL_DAYS),
             None, "Tage", None,
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS,
-            NumberMode.BOX, 1, False
+            NumberMode.BOX, 1, True
         )
         self.calib03_interval._attr_native_value = saved_interval
+        self.calib03_interval._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Time Start (hour)
         self.calib04_time_start = ZendureNumber(
             self, "calib04_time_start", make_save_callback(CONF_CALIB_TIME_START),
             None, "Uhr", None,
-            23, 0, NumberMode.BOX, 1, False
+            23, 0, NumberMode.BOX, 1, True
         )
         self.calib04_time_start._attr_native_value = saved_time_start
+        self.calib04_time_start._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Time End (hour)
         self.calib05_time_end = ZendureNumber(
             self, "calib05_time_end", make_save_callback(CONF_CALIB_TIME_END),
             None, "Uhr", None,
-            23, 0, NumberMode.BOX, 1, False
+            23, 0, NumberMode.BOX, 1, True
         )
         self.calib05_time_end._attr_native_value = saved_time_end
+        self.calib05_time_end._attr_entity_category = EntityCategory.CONFIG
         
         # Number: SoC Min (%)
         self.calib06_soc_min = ZendureNumber(
             self, "calib06_soc_min", make_save_callback(CONF_CALIB_SOC_MIN),
             None, "%", None,
-            100, 0, NumberMode.BOX, 1, False
+            100, 0, NumberMode.BOX, 1, True
         )
         self.calib06_soc_min._attr_native_value = saved_soc_min
         self.calib06_soc_min._attr_icon = "mdi:battery-low"
+        self.calib06_soc_min._attr_entity_category = EntityCategory.CONFIG
         
         # Number: SoC Max (%)
         self.calib07_soc_max = ZendureNumber(
             self, "calib07_soc_max", make_save_callback(CONF_CALIB_SOC_MAX),
             None, "%", None,
-            100, 0, NumberMode.BOX, 1, False
+            100, 0, NumberMode.BOX, 1, True
         )
         self.calib07_soc_max._attr_native_value = saved_soc_max
         self.calib07_soc_max._attr_icon = "mdi:battery-high"
+        self.calib07_soc_max._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Price Threshold (ct/kWh, optional)
         self.calib08_price_max = ZendureNumber(
             self, "calib08_price_max", make_save_callback(CONF_CALIB_PRICE_THRESHOLD),
             None, "ct/kWh", None,
             CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE,
-            NumberMode.BOX, 1, False
+            NumberMode.BOX, 1, True
         )
         self.calib08_price_max._attr_native_value = saved_price_threshold
+        self.calib08_price_max._attr_entity_category = EntityCategory.CONFIG
         
         # Select: Price Sensor (optional)
         # Get available sensors from Home Assistant
@@ -220,6 +228,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             data = self.config_entry.data | {CONF_CALIB_PRICE_SENSOR: sensor_id}
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
         self.calib09_price_sensor = ZendureRestoreSelect(self, "calib09_price_sensor", sensor_dict, save_price_sensor, sensor_current)
+        self.calib09_price_sensor._attr_entity_category = EntityCategory.CONFIG
         
         # Read-only status displays
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
