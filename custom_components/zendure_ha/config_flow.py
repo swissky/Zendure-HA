@@ -156,7 +156,7 @@ class ZendureOptionsFlowHandler(OptionsFlow):
         options_schema = vol.Schema({
             vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
             vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
-            vol.Required(CONF_SIM, default=self.config_entry.data[CONF_SIM]): bool,
+            vol.Required(CONF_SIM, default=self.config_entry.data.get(CONF_SIM, False)): bool,
         })
 
         return self.async_show_form(
