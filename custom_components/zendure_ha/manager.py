@@ -240,8 +240,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
         self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
         
-        # Initialize status displays
-        self._update_calibration_status()
+        # Initialize with default values (will be updated when devices are loaded)
+        next_date = datetime.now() + timedelta(days=saved_interval)
+        self.calibrationStatus.update_value("Aktiviert" if saved_enabled else "Deaktiviert")
+        self.nextCalibrationAll.update_value(next_date.isoformat())
 
         # load devices
         for dev in data["deviceList"]:
@@ -291,6 +293,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         await asyncio.sleep(1)  # allow other tasks to run
         self.update_fusegroups()
         Api.mqttLogging = True
+        
+        # Update calibration status now that devices are loaded
+        self._update_calibration_status()
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
@@ -411,7 +416,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         saved_interval = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
         
         # Update status text
-        self.calibrationStatus.update_value("Aktiviert" if saved_enabled else "Deaktiviert")
+        status_text = "Aktiviert" if saved_enabled else "Deaktiviert"
+        self.calibrationStatus.update_value(status_text)
+        _LOGGER.debug(f"Calibration status updated: {status_text}")
         
         # Calculate next calibration date
         if saved_enabled:
@@ -425,11 +432,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             
             if oldest_date != datetime.min:
                 next_date = oldest_date + timedelta(days=saved_interval)
+                _LOGGER.debug(f"Next calibration based on last: {next_date.isoformat()}")
             else:
                 next_date = datetime.now() + timedelta(days=saved_interval)
+                _LOGGER.debug(f"Next calibration based on now: {next_date.isoformat()}")
             
             self.nextCalibrationAll.update_value(next_date.isoformat())
         else:
+            _LOGGER.debug("Calibration disabled, clearing next calibration date")
             self.nextCalibrationAll.update_value("")
 
     async def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
