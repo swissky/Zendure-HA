@@ -104,25 +104,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
         # ═══════════════════════════════════════════════════════════
-        # CALIBRATION - Simple display sensors (read-only!)
-        # Settings are in Config Flow (guaranteed to work!)
+        # CALIBRATION - Read-only status displays
+        # ALL SETTINGS in Config Flow! (Zendure → Configure)
         # ═══════════════════════════════════════════════════════════
-        from homeassistant.helpers.entity import EntityCategory
         
-        # Read-only display sensors showing current config
         saved_interval = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
         saved_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
         
-        # Status and control (only these, no complex entities!)
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
+        self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
         
-        # Calculate next date from config
+        # Initialize from config
         next_date = datetime.now() + timedelta(days=saved_interval)
         self.nextCalibrationAll.update_value(next_date.isoformat())
         self.calibrationStatus.update_value("Aktiviert" if saved_enabled else "Deaktiviert")
-        
-        self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
 
         # load devices
         for dev in data["deviceList"]:
