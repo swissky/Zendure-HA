@@ -429,6 +429,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             current_mode = "charging"
 
         # Hysteresis: prevent rapid mode switching
+        time = datetime.now()  # Get current time for hysteresis check
         time_since_last_change = (time - self.last_mode_change).total_seconds()
         if current_mode != self.last_mode and time_since_last_change < SmartMode.MIN_SWITCH_INTERVAL:
             _LOGGER.info(
