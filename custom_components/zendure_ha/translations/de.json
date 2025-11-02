@@ -37,7 +37,15 @@
       "init": {
         "data": {
           "p1meter": "P1 Sensor für Smart Matching",
-          "mqttlog": "MQTT-Kommunikation loggen"
+          "mqttlog": "MQTT-Kommunikation loggen",
+          "calib_enabled": "Automatische Kalibrierung aktivieren",
+          "calib_price_sensor": "Strompreis-Sensor",
+          "calib_price_threshold": "Maximaler Preis für Kalibrierung (ct/kWh)",
+          "calib_interval_days": "Kalibrierungs-Intervall (Tage)",
+          "calib_time_start": "Kalibrierung Startzeit (Stunde)",
+          "calib_time_end": "Kalibrierung Endzeit (Stunde)",
+          "calib_soc_min": "Minimaler SoC für Kalibrierung (%)",
+          "calib_soc_max": "Maximaler SoC für Kalibrierung (%)"
         },
         "description": "Optionen anpassen",
         "title": "Zendure Integrationsoptionen"
@@ -48,6 +56,9 @@
     "button": {
       "mqtt_reset": {
         "name": "Reset Verbindung"
+      },
+      "start_calibration": {
+        "name": "Kalibrierung starten"
       }
     },
     "binary_sensor": {
@@ -263,6 +274,12 @@
       },
       "remaining_time": {
         "name": "Verbleibende Zeit"
+      },
+      "last_calibration": {
+        "name": "Letzte Kalibrierung"
+      },
+      "next_calibration": {
+        "name": "Nächste Kalibrierung"
       },
       "soft_version": {
         "name": "BMS-Firmware"

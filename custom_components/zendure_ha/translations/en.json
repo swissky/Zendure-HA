@@ -37,7 +37,15 @@
       "init": {
         "data": {
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlog": "Log MQTT communication"
+          "mqttlog": "Log MQTT communication",
+          "calib_enabled": "Enable automatic calibration",
+          "calib_price_sensor": "Electricity price sensor",
+          "calib_price_threshold": "Maximum price for calibration (ct/kWh)",
+          "calib_interval_days": "Calibration interval (days)",
+          "calib_time_start": "Calibration start time (hour)",
+          "calib_time_end": "Calibration end time (hour)",
+          "calib_soc_min": "Minimum SoC for calibration (%)",
+          "calib_soc_max": "Maximum SoC for calibration (%)"
         },
         "description": "Amend your options.",
         "title": "Zendure Integration Options"
@@ -48,6 +56,9 @@
     "button": {
       "mqtt_reset": {
         "name": "Reset connection"
+      },
+      "start_calibration": {
+        "name": "Start calibration"
       }
     },
     "binary_sensor": {
@@ -263,6 +274,12 @@
       },
       "remaining_time": {
         "name": "Remaining Time"
+      },
+      "last_calibration": {
+        "name": "Last Calibration"
+      },
+      "next_calibration": {
+        "name": "Next Calibration"
       },
       "soft_version": {
         "name": "BMS Firmware"

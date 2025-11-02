@@ -107,6 +107,11 @@ class ZendureDevice(EntityDevice):
         self.actualKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
 
+        # Calibration tracking
+        self.last_calibration: datetime = datetime.min
+        self.next_calibration: datetime = datetime.min
+        self.calibration_in_progress: bool = False
+
         self.create_entities()
 
     def create_entities(self) -> None:
@@ -140,6 +145,11 @@ class ZendureDevice(EntityDevice):
         self.aggrHomeOut = ZendureRestoreSensor(self, "aggrOutputHomeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrSolar = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
+        
+        # Calibration entities
+        self.lastCalibration = ZendureSensor(self, "lastCalibration", None, None, "timestamp", None)
+        self.nextCalibration = ZendureSensor(self, "nextCalibration", None, None, "timestamp", None)
+        self.calibrationButton = ZendureButton(self, "startCalibration", self.button_press)
 
     def setStatus(self) -> None:
         from .api import Api
@@ -196,7 +206,22 @@ class ZendureDevice(EntityDevice):
                     case "chargeLimit" | "chargeMaxLimit":
                         self.limitCharge = -value
                         self.limitInput.update_range(0, value)
-                    case "hemsState" | "socStatus":
+                    case "socStatus":
+                        # Track calibration state changes
+                        if value == 1 and not self.calibration_in_progress:
+                            # Calibration started (externally, e.g. via app)
+                            _LOGGER.info("Calibration started externally for %s", self.name)
+                            self.calibration_in_progress = True
+                            self.last_calibration = datetime.now()
+                            self.lastCalibration.update_value(self.last_calibration.isoformat())
+                        elif value == 0 and self.calibration_in_progress:
+                            # Calibration finished
+                            _LOGGER.info("Calibration completed for %s", self.name)
+                            self.calibration_in_progress = False
+                            # Calculate next calibration
+                            self.update_next_calibration()
+                        self.setStatus()
+                    case "hemsState":
                         self.setStatus()
                     case "electricLevel" | "minSoc" | "socLimit":
                         self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
@@ -241,7 +266,12 @@ class ZendureDevice(EntityDevice):
         if self.mqtt is not None:
             self.mqtt.publish(self.topic_write, payload)
 
-    async def button_press(self, _key: str) -> None:
+    async def button_press(self, button: ZendureButton) -> None:
+        """Handle button press events."""
+        match button.translation_key:
+            case "start_calibration":
+                _LOGGER.info("Manual calibration triggered for %s", self.name)
+                await self.start_calibration(manual=True)
         return
 
     def mqttPublish(self, topic: str, command: Any, client: mqtt_client.Client | None = None) -> None:
@@ -467,6 +497,102 @@ class ZendureDevice(EntityDevice):
     def pwr_offgrid(self) -> int:
         """Get the offgrid power."""
         return 0
+
+    async def start_calibration(self, manual: bool = False) -> bool:
+        """Start battery calibration process.
+        
+        Args:
+            manual: True if triggered manually by user, False if automatic
+            
+        Returns:
+            True if calibration was started, False otherwise
+        """
+        from homeassistant.components import persistent_notification
+        
+        # Check if already calibrating
+        if self.socStatus.asInt == 1:
+            _LOGGER.warning("Calibration already in progress for %s", self.name)
+            if manual:
+                persistent_notification.async_create(
+                    self.hass,
+                    f"Calibration already in progress for {self.name}",
+                    "Zendure Calibration",
+                    "zendure_calibration",
+                )
+            return False
+        
+        # Check if device is online
+        if not self.online:
+            _LOGGER.warning("Cannot start calibration - device %s is offline", self.name)
+            if manual:
+                persistent_notification.async_create(
+                    self.hass,
+                    f"Cannot start calibration - {self.name} is offline",
+                    "Zendure Calibration",
+                    "zendure_calibration",
+                )
+            return False
+        
+        # Start calibration by setting device to calibration mode
+        # The exact MQTT command depends on device type
+        # For now, we trigger it by sending a specific property
+        _LOGGER.info("Starting calibration for %s (manual=%s)", self.name, manual)
+        
+        try:
+            # Send calibration start command
+            # This might need to be device-specific
+            self.mqttPublish(
+                self.topic_write,
+                {
+                    "properties": {
+                        "socStatus": 1  # Set to calibration mode
+                    }
+                }
+            )
+            
+            # Update tracking
+            self.calibration_in_progress = True
+            self.last_calibration = datetime.now()
+            self.lastCalibration.update_value(self.last_calibration.isoformat())
+            
+            # Notification
+            if manual:
+                persistent_notification.async_create(
+                    self.hass,
+                    f"Calibration started for {self.name}",
+                    "Zendure Calibration",
+                    "zendure_calibration",
+                )
+            
+            return True
+            
+        except Exception as err:
+            _LOGGER.error("Failed to start calibration for %s: %s", self.name, err)
+            if manual:
+                persistent_notification.async_create(
+                    self.hass,
+                    f"Failed to start calibration for {self.name}: {err}",
+                    "Zendure Calibration Error",
+                    "zendure_calibration",
+                )
+            return False
+
+    def update_next_calibration(self) -> None:
+        """Calculate and update the next calibration date based on configuration."""
+        from .const import CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults
+        
+        # Get interval from config (default to 30 days)
+        if hasattr(self, 'hass') and self.hass.config_entries:
+            for entry in self.hass.config_entries.async_entries(DOMAIN):
+                interval_days = entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+                break
+        else:
+            interval_days = CalibrationDefaults.INTERVAL_DAYS
+        
+        # Calculate next calibration
+        self.next_calibration = self.last_calibration + timedelta(days=interval_days)
+        self.nextCalibration.update_value(self.next_calibration.isoformat())
+        _LOGGER.info("Next calibration for %s scheduled for: %s", self.name, self.next_calibration.strftime("%Y-%m-%d"))
 
 
 class ZendureLegacy(ZendureDevice):

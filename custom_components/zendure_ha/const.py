@@ -18,6 +18,16 @@ CONF_MQTTPSW = "mqttpsw"
 CONF_WIFISSID = "wifissid"
 CONF_WIFIPSW = "wifipsw"
 
+# Calibration configuration
+CONF_CALIB_ENABLED = "calib_enabled"
+CONF_CALIB_PRICE_SENSOR = "calib_price_sensor"
+CONF_CALIB_PRICE_THRESHOLD = "calib_price_threshold"
+CONF_CALIB_INTERVAL_DAYS = "calib_interval_days"
+CONF_CALIB_TIME_START = "calib_time_start"
+CONF_CALIB_TIME_END = "calib_time_end"
+CONF_CALIB_SOC_MIN = "calib_soc_min"
+CONF_CALIB_SOC_MAX = "calib_soc_max"
+
 CONF_HAKEY = "C*dafwArEOXK"
 
 
@@ -79,3 +89,22 @@ class SmartMode:
     KWHSTEP = 0.5
     STARTWATT = 40
     PEAKWATT = 500
+
+
+class CalibrationDefaults:
+    """Default values for battery calibration automation."""
+    
+    # Default settings
+    ENABLED = False  # Auto-calibration disabled by default
+    INTERVAL_DAYS = 30  # Calibrate once per month
+    PRICE_THRESHOLD = 15.0  # cents/kWh - only calibrate when price below this
+    TIME_START = 2  # Start time: 02:00 (night tariff)
+    TIME_END = 6  # End time: 06:00 (before sunrise)
+    SOC_MIN = 15  # Only calibrate if battery below 15% (deep cycle)
+    SOC_MAX = 85  # Or above 85% (full cycle)
+    
+    # Minimum/Maximum configurable values
+    MIN_INTERVAL_DAYS = 7  # At least weekly
+    MAX_INTERVAL_DAYS = 365  # At most yearly
+    MIN_PRICE = 0.0  # Minimum price threshold
+    MAX_PRICE = 50.0  # Maximum price threshold (cents/kWh)

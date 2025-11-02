@@ -230,6 +230,124 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         for d in self.devices:
                             await d.power_off()
 
+    async def check_auto_calibration(self, device: ZendureDevice) -> None:
+        """Check if automatic calibration should be triggered for a device.
+        
+        Checks all configured conditions:
+        - Auto-calibration enabled
+        - Interval since last calibration
+        - Current electricity price
+        - Time window
+        - Battery SoC level
+        """
+        from .const import (
+            CONF_CALIB_ENABLED,
+            CONF_CALIB_INTERVAL_DAYS,
+            CONF_CALIB_PRICE_SENSOR,
+            CONF_CALIB_PRICE_THRESHOLD,
+            CONF_CALIB_SOC_MAX,
+            CONF_CALIB_SOC_MIN,
+            CONF_CALIB_TIME_END,
+            CONF_CALIB_TIME_START,
+            CalibrationDefaults,
+        )
+        
+        # Get configuration
+        if not self.config_entry:
+            return
+        
+        # Check if auto-calibration is enabled
+        if not self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED):
+            return
+        
+        # Check if device is already calibrating
+        if device.calibration_in_progress or device.socStatus.asInt == 1:
+            return
+        
+        # Check interval - only calibrate if enough time has passed
+        interval_days = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+        if device.last_calibration != datetime.min:
+            days_since_last = (datetime.now() - device.last_calibration).days
+            if days_since_last < interval_days:
+                _LOGGER.debug(
+                    "Calibration for %s not due yet (%d/%d days)",
+                    device.name,
+                    days_since_last,
+                    interval_days,
+                )
+                return
+        
+        # Check time window
+        current_hour = datetime.now().hour
+        time_start = self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START)
+        time_end = self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END)
+        
+        if time_start <= time_end:
+            # Normal range (e.g. 2-6)
+            in_time_window = time_start <= current_hour < time_end
+        else:
+            # Overnight range (e.g. 22-6)
+            in_time_window = current_hour >= time_start or current_hour < time_end
+        
+        if not in_time_window:
+            return
+        
+        # Check battery SoC level - calibrate when very low or very high
+        soc = device.electricLevel.asInt
+        soc_min = self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN)
+        soc_max = self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
+        
+        if not (soc <= soc_min or soc >= soc_max):
+            _LOGGER.debug(
+                "Calibration for %s: SoC %d%% not in range (<%d%% or >%d%%)",
+                device.name,
+                soc,
+                soc_min,
+                soc_max,
+            )
+            return
+        
+        # Check electricity price (if configured)
+        price_sensor = self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")
+        if price_sensor:
+            try:
+                price_state = self.hass.states.get(price_sensor)
+                if price_state and price_state.state not in ("unavailable", "unknown"):
+                    current_price = float(price_state.state)
+                    price_threshold = self.config_entry.data.get(
+                        CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD
+                    )
+                    
+                    if current_price > price_threshold:
+                        _LOGGER.debug(
+                            "Calibration for %s: Price %.2f ct/kWh exceeds threshold %.2f ct/kWh",
+                            device.name,
+                            current_price,
+                            price_threshold,
+                        )
+                        return
+                    
+                    _LOGGER.info(
+                        "Calibration for %s: Price %.2f ct/kWh is below threshold %.2f ct/kWh - triggering!",
+                        device.name,
+                        current_price,
+                        price_threshold,
+                    )
+            except (ValueError, TypeError) as err:
+                _LOGGER.warning("Failed to read electricity price from %s: %s", price_sensor, err)
+                # Continue anyway if price sensor fails
+        
+        # All conditions met - trigger calibration!
+        _LOGGER.info(
+            "Auto-calibration triggered for %s (SoC: %d%%, Hour: %d, Days since last: %s)",
+            device.name,
+            soc,
+            current_hour,
+            "never" if device.last_calibration == datetime.min else str((datetime.now() - device.last_calibration).days),
+        )
+        
+        await device.start_calibration(manual=False)
+
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")
         await EntityDevice.add_entities()
@@ -257,6 +375,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
             await device.dataRefresh(self.update_count)
             device.setStatus()
+            
+            # Check if auto-calibration should be triggered
+            await self.check_auto_calibration(device)
+        
         self.update_count += 1
 
         # Manually update the timer
