@@ -93,10 +93,10 @@
         "name": "Intervall"
       },
       "calib04_time_start": {
-        "name": "Niedertarif Anfang"
+        "name": "NT Anfang"
       },
       "calib05_time_end": {
-        "name": "Niedertarif Ende"
+        "name": "NT Ende"
       },
       "calib06_soc_min": {
         "name": "SoC Min."
@@ -375,6 +375,12 @@
           "individual": "Individuell"
         }
       },
+      "calib09_price_sensor": {
+        "name": "Preis-Sensor",
+        "state": {
+          "Kein Sensor (nur Zeitfenster)": "Kein Sensor"
+        }
+      },
       "operation": {
         "name": "Betriebsmodus",
         "state": {
@@ -419,6 +425,9 @@
       }
     },
     "switch": {
+      "calib01_enabled": {
+        "name": "Aktivieren"
+      },
       "lamp_switch": {
         "name": "LED"
       },

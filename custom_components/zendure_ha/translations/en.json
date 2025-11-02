@@ -84,7 +84,7 @@
         "name": "Manual Power"
       },
       "calib01_enabled": {
-        "name": "Auto-Calibration"
+        "name": "Enable"
       },
       "calib02_mode": {
         "name": "Mode"
@@ -93,19 +93,19 @@
         "name": "Interval"
       },
       "calib04_time_start": {
-        "name": "Start Time"
+        "name": "Off-Peak Start"
       },
       "calib05_time_end": {
-        "name": "End Time"
+        "name": "Off-Peak End"
       },
       "calib06_soc_min": {
-        "name": "Min. SoC"
+        "name": "SoC Min."
       },
       "calib07_soc_max": {
-        "name": "Max. SoC"
+        "name": "SoC Max."
       },
       "calib08_price_max": {
-        "name": "Max. Price"
+        "name": "Price Max."
       },
       "calib09_price_sensor": {
         "name": "Price Sensor"
@@ -419,6 +419,9 @@
       }
     },
     "switch": {
+      "calib01_enabled": {
+        "name": "Enable"
+      },
       "lamp_switch": {
         "name": "LED"
       },

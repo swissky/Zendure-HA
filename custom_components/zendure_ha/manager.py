@@ -139,12 +139,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self, "calib06_soc_min", None, None, "%", "battery",
             100, 0, NumberMode.BOX
         )
+        self.calib06_soc_min._attr_icon = "mdi:battery-low"
         self.calib06_soc_min._attr_entity_category = EntityCategory.CONFIG
         
         self.calib07_soc_max = ZendureRestoreNumber(
             self, "calib07_soc_max", None, None, "%", "battery",
             100, 0, NumberMode.BOX
         )
+        self.calib07_soc_max._attr_icon = "mdi:battery-high"
         self.calib07_soc_max._attr_entity_category = EntityCategory.CONFIG
         
         self.calib08_price_max = ZendureRestoreNumber(
