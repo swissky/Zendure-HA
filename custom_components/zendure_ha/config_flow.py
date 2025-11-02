@@ -16,6 +16,7 @@ from .const import (
     CONF_APPTOKEN,
     CONF_CALIB_ENABLED,
     CONF_CALIB_INTERVAL_DAYS,
+    CONF_CALIB_MODE,
     CONF_CALIB_PRICE_SENSOR,
     CONF_CALIB_PRICE_THRESHOLD,
     CONF_CALIB_SOC_MAX,
@@ -176,6 +177,18 @@ class ZendureOptionsFlowHandler(OptionsFlow):
         # Calibration options (only show when enabled)
         if calib_enabled:
             options_schema.update({
+                vol.Optional(
+                    CONF_CALIB_MODE,
+                    default=self.config_entry.data.get(CONF_CALIB_MODE, CalibrationDefaults.MODE),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value="all_together", label="Alle Geräte zusammen kalibrieren"),
+                            selector.SelectOptionDict(value="individual", label="Jedes Gerät individuell konfigurieren"),
+                        ],
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Optional(
                     CONF_CALIB_PRICE_SENSOR,
                     description={"suggested_value": self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")},

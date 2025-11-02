@@ -39,13 +39,14 @@
           "p1meter": "P1 Sensor für Smart Matching",
           "mqttlog": "MQTT-Kommunikation loggen",
           "calib_enabled": "Automatische Kalibrierung aktivieren",
-          "calib_price_sensor": "Strompreis-Sensor",
-          "calib_price_threshold": "Maximaler Preis für Kalibrierung (ct/kWh)",
-          "calib_interval_days": "Kalibrierungs-Intervall (Tage)",
-          "calib_time_start": "Kalibrierung Startzeit (Stunde)",
-          "calib_time_end": "Kalibrierung Endzeit (Stunde)",
-          "calib_soc_min": "Minimaler SoC für Kalibrierung (%)",
-          "calib_soc_max": "Maximaler SoC für Kalibrierung (%)"
+          "calib_mode": "Kalibrierungs-Modus",
+          "calib_price_sensor": "Strompreis-Sensor (optional - für feste Tarife leer lassen)",
+          "calib_price_threshold": "Maximaler Preis für Kalibrierung",
+          "calib_interval_days": "Kalibrierungs-Intervall",
+          "calib_time_start": "Startzeit Niedertarif",
+          "calib_time_end": "Endzeit Niedertarif",
+          "calib_soc_min": "Minimaler SoC",
+          "calib_soc_max": "Maximaler SoC"
         },
         "description": "Optionen anpassen",
         "title": "Zendure Integrationsoptionen"
@@ -59,6 +60,9 @@
       },
       "start_calibration": {
         "name": "Kalibrierung starten"
+      },
+      "calibrate_all_devices": {
+        "name": "Alle Geräte kalibrieren"
       }
     },
     "binary_sensor": {
@@ -280,6 +284,12 @@
       },
       "next_calibration": {
         "name": "Nächste Kalibrierung"
+      },
+      "calibration_status": {
+        "name": "Kalibrierungs-Status"
+      },
+      "next_calibration_all": {
+        "name": "Nächste Kalibrierung (alle Geräte)"
       },
       "soft_version": {
         "name": "BMS-Firmware"

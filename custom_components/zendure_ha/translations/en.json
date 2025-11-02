@@ -39,13 +39,14 @@
           "p1meter": "P1 Sensor for smart matching",
           "mqttlog": "Log MQTT communication",
           "calib_enabled": "Enable automatic calibration",
-          "calib_price_sensor": "Electricity price sensor",
-          "calib_price_threshold": "Maximum price for calibration (ct/kWh)",
-          "calib_interval_days": "Calibration interval (days)",
-          "calib_time_start": "Calibration start time (hour)",
-          "calib_time_end": "Calibration end time (hour)",
-          "calib_soc_min": "Minimum SoC for calibration (%)",
-          "calib_soc_max": "Maximum SoC for calibration (%)"
+          "calib_mode": "Calibration mode",
+          "calib_price_sensor": "Electricity price sensor (optional - leave empty for fixed tariffs)",
+          "calib_price_threshold": "Maximum price for calibration",
+          "calib_interval_days": "Calibration interval",
+          "calib_time_start": "Off-peak tariff start time",
+          "calib_time_end": "Off-peak tariff end time",
+          "calib_soc_min": "Minimum SoC",
+          "calib_soc_max": "Maximum SoC"
         },
         "description": "Amend your options.",
         "title": "Zendure Integration Options"
@@ -59,6 +60,9 @@
       },
       "start_calibration": {
         "name": "Start calibration"
+      },
+      "calibrate_all_devices": {
+        "name": "Calibrate all devices"
       }
     },
     "binary_sensor": {
@@ -280,6 +284,12 @@
       },
       "next_calibration": {
         "name": "Next Calibration"
+      },
+      "calibration_status": {
+        "name": "Calibration Status"
+      },
+      "next_calibration_all": {
+        "name": "Next Calibration (all devices)"
       },
       "soft_version": {
         "name": "BMS Firmware"

@@ -20,6 +20,7 @@ CONF_WIFIPSW = "wifipsw"
 
 # Calibration configuration
 CONF_CALIB_ENABLED = "calib_enabled"
+CONF_CALIB_MODE = "calib_mode"  # "all_together" or "individual"
 CONF_CALIB_PRICE_SENSOR = "calib_price_sensor"
 CONF_CALIB_PRICE_THRESHOLD = "calib_price_threshold"
 CONF_CALIB_INTERVAL_DAYS = "calib_interval_days"
@@ -96,6 +97,7 @@ class CalibrationDefaults:
     
     # Default settings
     ENABLED = False  # Auto-calibration disabled by default
+    MODE = "all_together"  # Calibrate all devices together
     INTERVAL_DAYS = 30  # Calibrate once per month
     PRICE_THRESHOLD = 15.0  # cents/kWh - only calibrate when price below this
     TIME_START = 2  # Start time: 02:00 (night tariff)

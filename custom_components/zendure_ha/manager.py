@@ -86,6 +86,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 10000, -10000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
+        
+        # Manager-level calibration entities
+        self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
+        self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
+        self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
 
         # load devices
         for dev in data["deviceList"]:
@@ -211,6 +216,43 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 for d in fg.devices:
                     d.fuseGrp = fg
                 self.fuseGroups.append(fg)
+
+    async def button_calibrate_all(self, _button: Any) -> None:
+        """Manually trigger calibration for all devices."""
+        from homeassistant.components import persistent_notification
+        
+        _LOGGER.info("Manual calibration triggered for all devices")
+        
+        calibrated = 0
+        failed = 0
+        offline = 0
+        
+        for device in self.devices:
+            if not device.online:
+                offline += 1
+                continue
+            
+            success = await device.start_calibration(manual=True)
+            if success:
+                calibrated += 1
+            else:
+                failed += 1
+        
+        # Show summary notification
+        message = f"Calibration started for {calibrated} device(s)"
+        if failed > 0:
+            message += f", {failed} failed"
+        if offline > 0:
+            message += f", {offline} offline"
+        
+        persistent_notification.async_create(
+            self.hass,
+            message,
+            "Zendure Calibration",
+            "zendure_calibration_all",
+        )
+        
+        _LOGGER.info("Calibration summary: %d started, %d failed, %d offline", calibrated, failed, offline)
 
     async def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
