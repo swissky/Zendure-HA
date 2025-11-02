@@ -48,6 +48,7 @@ from .fusegroup import FuseGroup
 from .number import ZendureNumber, ZendureRestoreNumber
 from .select import ZendureRestoreSelect, ZendureSelect
 from .sensor import ZendureSensor
+from .switch import ZendureSwitch
 
 SCAN_INTERVAL = timedelta(seconds=60)
 
@@ -400,12 +401,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         # Calculate next calibration date
         if saved_enabled:
-            # Find oldest last_calibration date
+            # Find oldest last_calibration date (only if devices are loaded)
             oldest_date = datetime.min
-            for device in self.devices:
-                if device.last_calibration != datetime.min:
-                    if oldest_date == datetime.min or device.last_calibration < oldest_date:
-                        oldest_date = device.last_calibration
+            if hasattr(self, 'devices') and self.devices:
+                for device in self.devices:
+                    if hasattr(device, 'last_calibration') and device.last_calibration != datetime.min:
+                        if oldest_date == datetime.min or device.last_calibration < oldest_date:
+                            oldest_date = device.last_calibration
             
             if oldest_date != datetime.min:
                 next_date = oldest_date + timedelta(days=saved_interval)
