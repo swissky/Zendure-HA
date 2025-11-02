@@ -82,6 +82,24 @@
       }
     },
     "number": {
+      "calib03_interval": {
+        "name": "Intervall"
+      },
+      "calib04_time_start": {
+        "name": "NT Anfang"
+      },
+      "calib05_time_end": {
+        "name": "NT Ende"
+      },
+      "calib06_soc_min": {
+        "name": "SoC Min."
+      },
+      "calib07_soc_max": {
+        "name": "SoC Max."
+      },
+      "calib08_price_max": {
+        "name": "Preis Max."
+      },
       "input_limit": {
         "name": "Eingangslimit"
       },
@@ -349,6 +367,19 @@
           "cloud": "Cloud"
         }
       },
+      "calib02_mode": {
+        "name": "Modus",
+        "state": {
+          "all_together": "Alle zusammen",
+          "individual": "Individuell"
+        }
+      },
+      "calib09_price_sensor": {
+        "name": "Preis-Sensor",
+        "state": {
+          "Kein Sensor (nur Zeitfenster)": "Kein Sensor"
+        }
+      },
       "operation": {
         "name": "Betriebsmodus",
         "state": {
@@ -393,6 +424,9 @@
       }
     },
     "switch": {
+      "calib01_enabled": {
+        "name": "Aktivieren"
+      },
       "lamp_switch": {
         "name": "LED"
       },

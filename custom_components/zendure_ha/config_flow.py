@@ -14,15 +14,6 @@ from homeassistant.helpers import selector
 from .api import Api
 from .const import (
     CONF_APPTOKEN,
-    CONF_CALIB_ENABLED,
-    CONF_CALIB_INTERVAL_DAYS,
-    CONF_CALIB_MODE,
-    CONF_CALIB_PRICE_SENSOR,
-    CONF_CALIB_PRICE_THRESHOLD,
-    CONF_CALIB_SOC_MAX,
-    CONF_CALIB_SOC_MIN,
-    CONF_CALIB_TIME_END,
-    CONF_CALIB_TIME_START,
     CONF_MQTTLOCAL,
     CONF_MQTTLOG,
     CONF_MQTTPORT,
@@ -34,7 +25,6 @@ from .const import (
     CONF_WIFIPSW,
     CONF_WIFISSID,
     DOMAIN,
-    CalibrationDefaults,
 )
 from .manager import ZendureConfigEntry
 
@@ -163,49 +153,12 @@ class ZendureOptionsFlowHandler(OptionsFlow):
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             return self.async_create_entry(title="", data=data)
 
-        # Check if calibration is enabled
-        calib_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
-        
-        # Base schema
+        # ONLY basic settings - ALL calibration settings are in Manager Device!
         schema_dict = {
             vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
             vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
             vol.Required(CONF_SIM, default=self.config_entry.data.get(CONF_SIM, False)): bool,
-            vol.Required(CONF_CALIB_ENABLED, default=calib_enabled): bool,
         }
-        
-        # Add calibration options ONLY if enabled
-        if calib_enabled:
-            schema_dict.update({
-                vol.Required(
-                    CONF_CALIB_INTERVAL_DAYS,
-                    default=self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
-                ): vol.All(vol.Coerce(int), vol.Range(min=7, max=365)),
-                vol.Required(
-                    CONF_CALIB_TIME_START,
-                    default=self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START)
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=23)),
-                vol.Required(
-                    CONF_CALIB_TIME_END,
-                    default=self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END)
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=23)),
-                vol.Required(
-                    CONF_CALIB_SOC_MIN,
-                    default=self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN)
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
-                vol.Required(
-                    CONF_CALIB_SOC_MAX,
-                    default=self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
-                vol.Optional(
-                    CONF_CALIB_PRICE_THRESHOLD,
-                    default=self.config_entry.data.get(CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD)
-                ): vol.All(vol.Coerce(float), vol.Range(min=0, max=50)),
-                vol.Optional(
-                    CONF_CALIB_PRICE_SENSOR,
-                    default=self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")
-                ): str,
-            })
 
         return self.async_show_form(
             step_id="init",

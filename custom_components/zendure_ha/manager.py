@@ -104,21 +104,129 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
         # ═══════════════════════════════════════════════════════════
-        # CALIBRATION - Read-only status displays
-        # ALL SETTINGS in Config Flow! (Zendure → Configure)
+        # CALIBRATION - ALL settings in Manager Device!
         # ═══════════════════════════════════════════════════════════
+        from homeassistant.helpers.entity import EntityCategory
         
-        saved_interval = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+        # Helper function to create save callback for config_entry
+        def make_save_callback(config_key: str):
+            async def save_to_config(_entity: Any, value: Any) -> None:
+                data = self.config_entry.data | {config_key: value}
+                self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+                # Update status display
+                self._update_calibration_status()
+            return save_to_config
+        
+        # Read initial values from config
         saved_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
+        saved_mode = self.config_entry.data.get(CONF_CALIB_MODE, CalibrationDefaults.MODE)
+        saved_interval = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+        saved_time_start = self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START)
+        saved_time_end = self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END)
+        saved_soc_min = self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN)
+        saved_soc_max = self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
+        saved_price_threshold = self.config_entry.data.get(CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD)
+        saved_price_sensor = self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")
         
+        # Switch: Enable/Disable
+        async def save_enabled(_entity: Any, value: Any) -> None:
+            data = self.config_entry.data | {CONF_CALIB_ENABLED: bool(value)}
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+            self._update_calibration_status()
+        self.calib01_enabled = ZendureSwitch(self, "calib01_enabled", save_enabled, None, None, saved_enabled)
+        
+        # Select: Mode (all_together / individual)
+        mode_dict = {0: "all_together", 1: "individual"}
+        mode_current = 0 if saved_mode == "all_together" else 1
+        async def save_mode(_entity: Any, value: Any) -> None:
+            # value is the key (0 or 1), not the string
+            mode_str = mode_dict[value]
+            data = self.config_entry.data | {CONF_CALIB_MODE: mode_str}
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+        self.calib02_mode = ZendureRestoreSelect(self, "calib02_mode", mode_dict, save_mode, mode_current)
+        
+        # Number: Interval (days)
+        self.calib03_interval = ZendureNumber(
+            self, "calib03_interval", make_save_callback(CONF_CALIB_INTERVAL_DAYS),
+            None, "Tage", None,
+            CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS,
+            NumberMode.BOX, 1, False
+        )
+        self.calib03_interval._attr_native_value = saved_interval
+        
+        # Number: Time Start (hour)
+        self.calib04_time_start = ZendureNumber(
+            self, "calib04_time_start", make_save_callback(CONF_CALIB_TIME_START),
+            None, "Uhr", None,
+            23, 0, NumberMode.BOX, 1, False
+        )
+        self.calib04_time_start._attr_native_value = saved_time_start
+        
+        # Number: Time End (hour)
+        self.calib05_time_end = ZendureNumber(
+            self, "calib05_time_end", make_save_callback(CONF_CALIB_TIME_END),
+            None, "Uhr", None,
+            23, 0, NumberMode.BOX, 1, False
+        )
+        self.calib05_time_end._attr_native_value = saved_time_end
+        
+        # Number: SoC Min (%)
+        self.calib06_soc_min = ZendureNumber(
+            self, "calib06_soc_min", make_save_callback(CONF_CALIB_SOC_MIN),
+            None, "%", None,
+            100, 0, NumberMode.BOX, 1, False
+        )
+        self.calib06_soc_min._attr_native_value = saved_soc_min
+        self.calib06_soc_min._attr_icon = "mdi:battery-low"
+        
+        # Number: SoC Max (%)
+        self.calib07_soc_max = ZendureNumber(
+            self, "calib07_soc_max", make_save_callback(CONF_CALIB_SOC_MAX),
+            None, "%", None,
+            100, 0, NumberMode.BOX, 1, False
+        )
+        self.calib07_soc_max._attr_native_value = saved_soc_max
+        self.calib07_soc_max._attr_icon = "mdi:battery-high"
+        
+        # Number: Price Threshold (ct/kWh, optional)
+        self.calib08_price_max = ZendureNumber(
+            self, "calib08_price_max", make_save_callback(CONF_CALIB_PRICE_THRESHOLD),
+            None, "ct/kWh", None,
+            CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE,
+            NumberMode.BOX, 1, False
+        )
+        self.calib08_price_max._attr_native_value = saved_price_threshold
+        
+        # Select: Price Sensor (optional)
+        # Get available sensors from Home Assistant
+        sensor_list = ["Kein Sensor (nur Zeitfenster)"]
+        state = self.hass.states.async_all()
+        for entity in state:
+            if entity.domain == "sensor" and entity.attributes.get("unit_of_measurement", "").startswith(("€", "CHF", "$", "ct")):
+                sensor_list.append(entity.entity_id)
+        
+        sensor_dict = {i: v for i, v in enumerate(sensor_list)}
+        sensor_current = 0
+        if saved_price_sensor:
+            try:
+                sensor_current = sensor_list.index(saved_price_sensor)
+            except ValueError:
+                pass
+        
+        async def save_price_sensor(_entity: Any, value: Any) -> None:
+            # value is the index key
+            sensor_id = "" if value == 0 else sensor_list[value]
+            data = self.config_entry.data | {CONF_CALIB_PRICE_SENSOR: sensor_id}
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+        self.calib09_price_sensor = ZendureRestoreSelect(self, "calib09_price_sensor", sensor_dict, save_price_sensor, sensor_current)
+        
+        # Read-only status displays
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
         self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
         
-        # Initialize from config
-        next_date = datetime.now() + timedelta(days=saved_interval)
-        self.nextCalibrationAll.update_value(next_date.isoformat())
-        self.calibrationStatus.update_value("Aktiviert" if saved_enabled else "Deaktiviert")
+        # Initialize status displays
+        self._update_calibration_status()
 
         # load devices
         for dev in data["deviceList"]:
@@ -281,6 +389,32 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         
         _LOGGER.info("Calibration summary: %d started, %d failed, %d offline", calibrated, failed, offline)
+
+    def _update_calibration_status(self) -> None:
+        """Update the calibration status display sensors."""
+        saved_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
+        saved_interval = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+        
+        # Update status text
+        self.calibrationStatus.update_value("Aktiviert" if saved_enabled else "Deaktiviert")
+        
+        # Calculate next calibration date
+        if saved_enabled:
+            # Find oldest last_calibration date
+            oldest_date = datetime.min
+            for device in self.devices:
+                if device.last_calibration != datetime.min:
+                    if oldest_date == datetime.min or device.last_calibration < oldest_date:
+                        oldest_date = device.last_calibration
+            
+            if oldest_date != datetime.min:
+                next_date = oldest_date + timedelta(days=saved_interval)
+            else:
+                next_date = datetime.now() + timedelta(days=saved_interval)
+            
+            self.nextCalibrationAll.update_value(next_date.isoformat())
+        else:
+            self.nextCalibrationAll.update_value("")
 
     async def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
