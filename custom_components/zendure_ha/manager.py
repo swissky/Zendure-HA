@@ -116,8 +116,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.calib02_mode._attr_entity_category = EntityCategory.CONFIG
         
+        # Callback to update next calibration when interval changes
+        async def update_next_calib(entity: Any, value: Any) -> None:
+            days = int(value) if value else CalibrationDefaults.INTERVAL_DAYS
+            next_date = datetime.now() + timedelta(days=days)
+            self.nextCalibrationAll.update_value(next_date.isoformat())
+            self.calibrationStatus.update_value(f"Nächste in {days} Tagen")
+            _LOGGER.info("Next calibration: %s (%d days)", next_date.strftime("%Y-%m-%d"), days)
+        
         self.calib03_interval = ZendureRestoreNumber(
-            self, "calib03_interval", None, None, "Tage", None,
+            self, "calib03_interval", update_next_calib, None, "Tage", None,
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
             NumberMode.BOX
         )
@@ -173,7 +181,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         # Status and control (main area, not config)
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
+        self.calibrationStatus.update_value("Bereit")  # Initialize with ready state
+        
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
+        # Calculate initial next calibration date based on interval
+        next_date = datetime.now() + timedelta(days=CalibrationDefaults.INTERVAL_DAYS)
+        self.nextCalibrationAll.update_value(next_date.isoformat())
+        
         self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
 
         # load devices
