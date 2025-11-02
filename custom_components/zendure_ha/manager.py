@@ -89,6 +89,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
         # Calibration control entities - All settings in Manager device!
+        from homeassistant.helpers.entity import EntityCategory
         from .switch import ZendureSwitch
         
         # Dummy handler for calibration switch (state is tracked automatically)
@@ -96,40 +97,57 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.debug("Calibration enabled changed to: %s", value)
         
         self.calibEnabled = ZendureSwitch(self, "calib_enabled", calib_switch_handler, None, "switch", CalibrationDefaults.ENABLED)
+        self.calibEnabled._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibMode = ZendureRestoreSelect(
             self, "calib_mode", 
             {0: "all_together", 1: "individual"}, 
             None, 
             0
         )
-        self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")  # Text entity for sensor name
+        self.calibMode._attr_entity_category = EntityCategory.CONFIG
+        
+        self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")
+        self.calibPriceSensor._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibPriceThreshold = ZendureRestoreNumber(
             self, "calib_price_threshold", None, None, "ct/kWh", None,
             CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX
         )
+        self.calibPriceThreshold._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibIntervalDays = ZendureRestoreNumber(
             self, "calib_interval_days", None, None, "days", None,
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
             NumberMode.SLIDER
         )
+        self.calibIntervalDays._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibTimeStart = ZendureRestoreNumber(
             self, "calib_time_start", None, None, "h", None,
             23, 0, NumberMode.BOX
         )
+        self.calibTimeStart._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibTimeEnd = ZendureRestoreNumber(
             self, "calib_time_end", None, None, "h", None,
             23, 0, NumberMode.BOX
         )
+        self.calibTimeEnd._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibSocMin = ZendureRestoreNumber(
             self, "calib_soc_min", None, None, "%", "battery",
             100, 0, NumberMode.SLIDER
         )
+        self.calibSocMin._attr_entity_category = EntityCategory.CONFIG
+        
         self.calibSocMax = ZendureRestoreNumber(
             self, "calib_soc_max", None, None, "%", "battery",
             100, 0, NumberMode.SLIDER
         )
+        self.calibSocMax._attr_entity_category = EntityCategory.CONFIG
         
-        # Status and control entities
+        # Status and control entities (stay in main area)
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
         self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
