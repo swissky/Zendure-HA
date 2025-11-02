@@ -137,15 +137,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.calib01_enabled = ZendureSwitch(self, "calib01_enabled", save_enabled, None, None, saved_enabled)
         self.calib01_enabled._attr_entity_category = EntityCategory.CONFIG
         
-        # Select: Mode (all_together / individual)
-        mode_dict = {0: "all_together", 1: "individual"}
+        # Select: Mode (all_together / individual) - using ZendureSelect instead of Restore
+        mode_options = ["all_together", "individual"]
+        mode_dict = {i: opt for i, opt in enumerate(mode_options)}
         mode_current = 0 if saved_mode == "all_together" else 1
+        
         async def save_mode(_entity: Any, value: Any) -> None:
-            # value is the key (0 or 1), not the string
+            # value is the key (0 or 1)
             mode_str = mode_dict[value]
             data = self.config_entry.data | {CONF_CALIB_MODE: mode_str}
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
-        self.calib02_mode = ZendureRestoreSelect(self, "calib02_mode", mode_dict, save_mode, mode_current)
+        
+        self.calib02_mode = ZendureSelect(self, "calib02_mode", mode_dict, save_mode, mode_current)
         self.calib02_mode._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Interval (days)
@@ -196,18 +199,17 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.calib07_soc_max._attr_icon = "mdi:battery-high"
         self.calib07_soc_max._attr_entity_category = EntityCategory.CONFIG
         
-        # Number: Price Threshold (ct/kWh, optional)
+        # Number: Price Threshold (ct/kWh, optional - 0 = deaktiviert)
         self.calib08_price_max = ZendureNumber(
             self, "calib08_price_max", make_save_callback(CONF_CALIB_PRICE_THRESHOLD),
             None, "ct/kWh", None,
-            CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE,
+            CalibrationDefaults.MAX_PRICE, 0,  # Min ist 0 (= deaktiviert)
             NumberMode.BOX, 1, True
         )
         self.calib08_price_max._attr_native_value = saved_price_threshold
         self.calib08_price_max._attr_entity_category = EntityCategory.CONFIG
         
-        # Select: Price Sensor (optional)
-        # Get available sensors from Home Assistant
+        # Select: Price Sensor (optional) - using ZendureSelect for proper functionality
         sensor_list = ["Kein Sensor (nur Zeitfenster)"]
         state = self.hass.states.async_all()
         for entity in state:
@@ -216,18 +218,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         sensor_dict = {i: v for i, v in enumerate(sensor_list)}
         sensor_current = 0
-        if saved_price_sensor:
-            try:
-                sensor_current = sensor_list.index(saved_price_sensor)
-            except ValueError:
-                pass
+        if saved_price_sensor and saved_price_sensor in sensor_list:
+            sensor_current = sensor_list.index(saved_price_sensor)
         
         async def save_price_sensor(_entity: Any, value: Any) -> None:
             # value is the index key
             sensor_id = "" if value == 0 else sensor_list[value]
             data = self.config_entry.data | {CONF_CALIB_PRICE_SENSOR: sensor_id}
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
-        self.calib09_price_sensor = ZendureRestoreSelect(self, "calib09_price_sensor", sensor_dict, save_price_sensor, sensor_current)
+        
+        self.calib09_price_sensor = ZendureSelect(self, "calib09_price_sensor", sensor_dict, save_price_sensor, sensor_current)
         self.calib09_price_sensor._attr_entity_category = EntityCategory.CONFIG
         
         # Read-only status displays
