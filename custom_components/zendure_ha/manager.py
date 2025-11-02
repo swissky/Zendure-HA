@@ -163,7 +163,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS,
             NumberMode.BOX, 1, True
         )
-        self.calib03_interval._attr_native_value = saved_interval
+        self.calib03_interval._attr_native_value = float(saved_interval)
         self.calib03_interval._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Time Start (hour)
@@ -172,7 +172,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             None, "Uhr", None,
             23, 0, NumberMode.BOX, 1, True
         )
-        self.calib04_time_start._attr_native_value = saved_time_start
+        self.calib04_time_start._attr_native_value = float(saved_time_start)
         self.calib04_time_start._attr_entity_category = EntityCategory.CONFIG
         
         # Number: Time End (hour)
@@ -181,7 +181,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             None, "Uhr", None,
             23, 0, NumberMode.BOX, 1, True
         )
-        self.calib05_time_end._attr_native_value = saved_time_end
+        self.calib05_time_end._attr_native_value = float(saved_time_end)
         self.calib05_time_end._attr_entity_category = EntityCategory.CONFIG
         
         # Number: SoC Min (%)
@@ -190,7 +190,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             None, "%", None,
             100, 0, NumberMode.BOX, 1, True
         )
-        self.calib06_soc_min._attr_native_value = saved_soc_min
+        self.calib06_soc_min._attr_native_value = float(saved_soc_min)
         self.calib06_soc_min._attr_icon = "mdi:battery-low"
         self.calib06_soc_min._attr_entity_category = EntityCategory.CONFIG
         
@@ -200,7 +200,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             None, "%", None,
             100, 0, NumberMode.BOX, 1, True
         )
-        self.calib07_soc_max._attr_native_value = saved_soc_max
+        self.calib07_soc_max._attr_native_value = float(saved_soc_max)
         self.calib07_soc_max._attr_icon = "mdi:battery-high"
         self.calib07_soc_max._attr_entity_category = EntityCategory.CONFIG
         
@@ -211,7 +211,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             CalibrationDefaults.MAX_PRICE, 0,  # Min ist 0 (= deaktiviert)
             NumberMode.BOX, 1, True
         )
-        self.calib08_price_max._attr_native_value = saved_price_threshold
+        self.calib08_price_max._attr_native_value = float(saved_price_threshold)  # MUST be float!
         self.calib08_price_max._attr_entity_category = EntityCategory.CONFIG
         
         # Select: Price Sensor (optional) - using ZendureSelect for proper functionality
