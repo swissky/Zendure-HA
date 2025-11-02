@@ -83,23 +83,32 @@
       "manual_power": {
         "name": "Manual Power"
       },
-      "calib_price_threshold": {
-        "name": "Max. Price"
+      "calib01_enabled": {
+        "name": "Auto-Calibration"
       },
-      "calib_interval_days": {
+      "calib02_mode": {
+        "name": "Mode"
+      },
+      "calib03_interval": {
         "name": "Interval"
       },
-      "calib_time_start": {
+      "calib04_time_start": {
         "name": "Start Time"
       },
-      "calib_time_end": {
+      "calib05_time_end": {
         "name": "End Time"
       },
-      "calib_soc_min": {
+      "calib06_soc_min": {
         "name": "Min. SoC"
       },
-      "calib_soc_max": {
+      "calib07_soc_max": {
         "name": "Max. SoC"
+      },
+      "calib08_price_max": {
+        "name": "Max. Price"
+      },
+      "calib09_price_sensor": {
+        "name": "Price Sensor"
       },
       "min_soc": {
         "name": "SoC Minimum"
@@ -300,12 +309,6 @@
       "next_calibration_all": {
         "name": "Next Calibration (all devices)"
       },
-      "calib_price_sensor": {
-        "name": "Price Sensor (opt.)",
-        "state": {
-          "": "No sensor (time window only)"
-        }
-      },
       "soft_version": {
         "name": "BMS Firmware"
       },
@@ -365,7 +368,7 @@
           "cloud": "Cloud"
         }
       },
-      "calib_mode": {
+      "calib02_mode": {
         "name": "Mode",
         "state": {
           "all_together": "All together",
@@ -416,9 +419,6 @@
       }
     },
     "switch": {
-      "calib_enabled": {
-        "name": "Auto-Calibration"
-      },
       "lamp_switch": {
         "name": "LED"
       },
