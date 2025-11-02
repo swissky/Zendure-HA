@@ -101,29 +101,28 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")  # Text entity for sensor name
         self.calibPriceThreshold = ZendureRestoreNumber(
             self, "calib_price_threshold", None, None, "ct/kWh", None,
-            CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX, 
-            1, CalibrationDefaults.PRICE_THRESHOLD
+            CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX
         )
         self.calibIntervalDays = ZendureRestoreNumber(
             self, "calib_interval_days", None, None, "days", None,
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
-            NumberMode.SLIDER, 0, CalibrationDefaults.INTERVAL_DAYS
+            NumberMode.SLIDER
         )
         self.calibTimeStart = ZendureRestoreNumber(
             self, "calib_time_start", None, None, "h", None,
-            23, 0, NumberMode.BOX, 0, CalibrationDefaults.TIME_START
+            23, 0, NumberMode.BOX
         )
         self.calibTimeEnd = ZendureRestoreNumber(
             self, "calib_time_end", None, None, "h", None,
-            23, 0, NumberMode.BOX, 0, CalibrationDefaults.TIME_END
+            23, 0, NumberMode.BOX
         )
         self.calibSocMin = ZendureRestoreNumber(
             self, "calib_soc_min", None, None, "%", "battery",
-            100, 0, NumberMode.SLIDER, 0, CalibrationDefaults.SOC_MIN
+            100, 0, NumberMode.SLIDER
         )
         self.calibSocMax = ZendureRestoreNumber(
             self, "calib_soc_max", None, None, "%", "battery",
-            100, 0, NumberMode.SLIDER, 0, CalibrationDefaults.SOC_MAX
+            100, 0, NumberMode.SLIDER
         )
         
         # Status and control entities
