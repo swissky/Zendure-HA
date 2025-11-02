@@ -84,31 +84,31 @@
         "name": "Manuelle Leistung"
       },
       "calib01_enabled": {
-        "name": "Auto-Kalibrierung"
+        "name": "01. Aktivieren"
       },
       "calib02_mode": {
-        "name": "Modus"
+        "name": "02. Modus"
       },
       "calib03_interval": {
-        "name": "Intervall"
+        "name": "03. Intervall"
       },
       "calib04_time_start": {
-        "name": "Start (NT)"
+        "name": "04. Start (NT)"
       },
       "calib05_time_end": {
-        "name": "Ende (NT)"
+        "name": "05. Ende (NT)"
       },
       "calib06_soc_min": {
-        "name": "Min. SoC"
+        "name": "06. Min. SoC"
       },
       "calib07_soc_max": {
-        "name": "Max. SoC"
+        "name": "07. Max. SoC"
       },
       "calib08_price_max": {
-        "name": "Max. Preis"
+        "name": "08. Max. Preis"
       },
       "calib09_price_sensor": {
-        "name": "Preis-Sensor"
+        "name": "09. Preis-Sensor"
       },
       "min_soc": {
         "name": "SoC-Minimum"
