@@ -96,9 +96,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         async def calib_switch_handler(entity: Any, value: Any) -> None:
             _LOGGER.debug("Calibration enabled changed to: %s", value)
         
+        # 1. Enable Switch
         self.calibEnabled = ZendureSwitch(self, "calib_enabled", calib_switch_handler, None, "switch", CalibrationDefaults.ENABLED)
         self.calibEnabled._attr_entity_category = EntityCategory.CONFIG
         
+        # 2. Mode Selection
         self.calibMode = ZendureRestoreSelect(
             self, "calib_mode", 
             {0: "all_together", 1: "individual"}, 
@@ -107,45 +109,52 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.calibMode._attr_entity_category = EntityCategory.CONFIG
         
-        self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")
-        self.calibPriceSensor._attr_entity_category = EntityCategory.CONFIG
+        # 3. Interval (BOX not slider!)
+        self.calibIntervalDays = ZendureRestoreNumber(
+            self, "calib_interval_days", None, None, "Tage", None,
+            CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
+            NumberMode.BOX
+        )
+        self.calibIntervalDays._attr_entity_category = EntityCategory.CONFIG
         
+        # 4. Time Start (BEFORE End!)
+        self.calibTimeStart = ZendureRestoreNumber(
+            self, "calib_time_start", None, None, "Uhr", None,
+            23, 0, NumberMode.BOX
+        )
+        self.calibTimeStart._attr_entity_category = EntityCategory.CONFIG
+        
+        # 5. Time End (RIGHT AFTER Start!)
+        self.calibTimeEnd = ZendureRestoreNumber(
+            self, "calib_time_end", None, None, "Uhr", None,
+            23, 0, NumberMode.BOX
+        )
+        self.calibTimeEnd._attr_entity_category = EntityCategory.CONFIG
+        
+        # 6. SoC Min (BOX not slider!)
+        self.calibSocMin = ZendureRestoreNumber(
+            self, "calib_soc_min", None, None, "%", "battery",
+            100, 0, NumberMode.BOX
+        )
+        self.calibSocMin._attr_entity_category = EntityCategory.CONFIG
+        
+        # 7. SoC Max
+        self.calibSocMax = ZendureRestoreNumber(
+            self, "calib_soc_max", None, None, "%", "battery",
+            100, 0, NumberMode.BOX
+        )
+        self.calibSocMax._attr_entity_category = EntityCategory.CONFIG
+        
+        # 8. Price Threshold
         self.calibPriceThreshold = ZendureRestoreNumber(
             self, "calib_price_threshold", None, None, "ct/kWh", None,
             CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX
         )
         self.calibPriceThreshold._attr_entity_category = EntityCategory.CONFIG
         
-        self.calibIntervalDays = ZendureRestoreNumber(
-            self, "calib_interval_days", None, None, "days", None,
-            CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
-            NumberMode.SLIDER
-        )
-        self.calibIntervalDays._attr_entity_category = EntityCategory.CONFIG
-        
-        self.calibTimeStart = ZendureRestoreNumber(
-            self, "calib_time_start", None, None, "h", None,
-            23, 0, NumberMode.BOX
-        )
-        self.calibTimeStart._attr_entity_category = EntityCategory.CONFIG
-        
-        self.calibTimeEnd = ZendureRestoreNumber(
-            self, "calib_time_end", None, None, "h", None,
-            23, 0, NumberMode.BOX
-        )
-        self.calibTimeEnd._attr_entity_category = EntityCategory.CONFIG
-        
-        self.calibSocMin = ZendureRestoreNumber(
-            self, "calib_soc_min", None, None, "%", "battery",
-            100, 0, NumberMode.SLIDER
-        )
-        self.calibSocMin._attr_entity_category = EntityCategory.CONFIG
-        
-        self.calibSocMax = ZendureRestoreNumber(
-            self, "calib_soc_max", None, None, "%", "battery",
-            100, 0, NumberMode.SLIDER
-        )
-        self.calibSocMax._attr_entity_category = EntityCategory.CONFIG
+        # 9. Price Sensor (text input for sensor name)
+        self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")
+        self.calibPriceSensor._attr_entity_category = EntityCategory.CONFIG
         
         # Status and control entities (stay in main area)
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)

@@ -37,18 +37,9 @@
       "init": {
         "data": {
           "p1meter": "P1 Sensor für Smart Matching",
-          "mqttlog": "MQTT-Kommunikation loggen",
-          "calib_enabled": "Automatische Kalibrierung aktivieren",
-          "calib_mode": "Kalibrierungs-Modus",
-          "calib_price_sensor": "Strompreis-Sensor (optional - für feste Tarife leer lassen)",
-          "calib_price_threshold": "Maximaler Preis für Kalibrierung",
-          "calib_interval_days": "Kalibrierungs-Intervall",
-          "calib_time_start": "Startzeit Niedertarif",
-          "calib_time_end": "Endzeit Niedertarif",
-          "calib_soc_min": "Minimaler SoC",
-          "calib_soc_max": "Maximaler SoC"
+          "mqttlog": "MQTT-Kommunikation loggen"
         },
-        "description": "Optionen anpassen",
+        "description": "Kalibrierung konfigurieren über Zendure Manager!",
         "title": "Zendure Integrationsoptionen"
       }
     }

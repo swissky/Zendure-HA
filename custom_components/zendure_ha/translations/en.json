@@ -37,18 +37,9 @@
       "init": {
         "data": {
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlog": "Log MQTT communication",
-          "calib_enabled": "Enable automatic calibration",
-          "calib_mode": "Calibration mode",
-          "calib_price_sensor": "Electricity price sensor (optional - leave empty for fixed tariffs)",
-          "calib_price_threshold": "Maximum price for calibration",
-          "calib_interval_days": "Calibration interval",
-          "calib_time_start": "Off-peak tariff start time",
-          "calib_time_end": "Off-peak tariff end time",
-          "calib_soc_min": "Minimum SoC",
-          "calib_soc_max": "Maximum SoC"
+          "mqttlog": "Log MQTT communication"
         },
-        "description": "Amend your options.",
+        "description": "Calibration configured via Zendure Manager entities!",
         "title": "Zendure Integration Options"
       }
     }
