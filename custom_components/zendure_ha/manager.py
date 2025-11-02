@@ -91,7 +91,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Calibration control entities - All settings in Manager device!
         from .switch import ZendureSwitch
         
-        self.calibEnabled = ZendureSwitch(self, "calib_enabled", None, None, "switch", CalibrationDefaults.ENABLED)
+        # Dummy handler for calibration switch (state is tracked automatically)
+        async def calib_switch_handler(entity: Any, value: Any) -> None:
+            _LOGGER.debug("Calibration enabled changed to: %s", value)
+        
+        self.calibEnabled = ZendureSwitch(self, "calib_enabled", calib_switch_handler, None, "switch", CalibrationDefaults.ENABLED)
         self.calibMode = ZendureRestoreSelect(
             self, "calib_mode", 
             {0: "all_together", 1: "individual"}, 
