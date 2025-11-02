@@ -26,11 +26,26 @@ from homeassistant.loader import async_get_integration
 
 from .api import Api
 from .button import ZendureButton
-from .const import CalibrationDefaults, CONF_P1METER, DOMAIN, DeviceState, SmartMode
+from .const import (
+    CalibrationDefaults,
+    CONF_CALIB_ENABLED,
+    CONF_CALIB_INTERVAL_DAYS,
+    CONF_CALIB_MODE,
+    CONF_CALIB_PRICE_SENSOR,
+    CONF_CALIB_PRICE_THRESHOLD,
+    CONF_CALIB_SOC_MAX,
+    CONF_CALIB_SOC_MIN,
+    CONF_CALIB_TIME_END,
+    CONF_CALIB_TIME_START,
+    CONF_P1METER,
+    DOMAIN,
+    DeviceState,
+    SmartMode,
+)
 from .device import DeviceSettings, ZendureDevice, ZendureLegacy
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
-from .number import ZendureRestoreNumber
+from .number import ZendureNumber, ZendureRestoreNumber
 from .select import ZendureRestoreSelect, ZendureSelect
 from .sensor import ZendureSensor
 
@@ -95,9 +110,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         from homeassistant.helpers.entity import EntityCategory
         from .switch import ZendureSwitch
         
+        # Helper to create callback that saves to config entry
+        def make_save_callback(config_key: str):
+            async def save_to_config(entity: Any, value: Any) -> None:
+                # Save to config entry (THIS is persistent!)
+                data = self.config_entry.data | {config_key: value}
+                self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+                _LOGGER.debug("Saved %s = %s to config", config_key, value)
+            return save_to_config
+        
         # Switch handler that persists state
         async def calib_switch_handler(entity: ZendureSwitch, value: int) -> None:
             entity._attr_is_on = bool(value)
+            # Save to config!
+            data = self.config_entry.data | {CONF_CALIB_ENABLED: bool(value)}
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             if entity.hass and entity.hass.loop.is_running():
                 entity.schedule_update_ha_state()
             _LOGGER.info("Auto-Calibration %s", "enabled" if value else "disabled")
@@ -105,7 +132,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Prefix with numbers to control order: 01_, 02_, 03_, etc.
         # This ensures correct display order in UI!
         
-        self.calib01_enabled = ZendureSwitch(self, "calib01_enabled", calib_switch_handler, None, "switch", False)
+        # Load saved state from config
+        saved_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
+        self.calib01_enabled = ZendureSwitch(self, "calib01_enabled", calib_switch_handler, None, "switch", saved_enabled)
         self.calib01_enabled._attr_entity_category = EntityCategory.CONFIG
         
         self.calib02_mode = ZendureRestoreSelect(
@@ -116,50 +145,68 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.calib02_mode._attr_entity_category = EntityCategory.CONFIG
         
-        # Callback to update next calibration when interval changes
-        async def update_next_calib(entity: Any, value: Any) -> None:
+        # Callback that saves to config AND updates next calibration
+        async def save_interval(entity: Any, value: Any) -> None:
             days = int(value) if value else CalibrationDefaults.INTERVAL_DAYS
+            # Save to config entry (persistent!)
+            data = self.config_entry.data | {CONF_CALIB_INTERVAL_DAYS: days}
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+            # Update next date
             next_date = datetime.now() + timedelta(days=days)
             self.nextCalibrationAll.update_value(next_date.isoformat())
             self.calibrationStatus.update_value(f"Nächste in {days} Tagen")
-            _LOGGER.info("Next calibration: %s (%d days)", next_date.strftime("%Y-%m-%d"), days)
+            _LOGGER.info("Interval saved: %d days, next: %s", days, next_date.strftime("%Y-%m-%d"))
         
-        self.calib03_interval = ZendureRestoreNumber(
-            self, "calib03_interval", update_next_calib, None, "Tage", None,
+        # Load value from config (persistent storage!)
+        saved_interval = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+        
+        self.calib03_interval = ZendureNumber(
+            self, "calib03_interval", save_interval, None, "Tage", None,
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
-            NumberMode.BOX
+            NumberMode.BOX, saved_interval
         )
         self.calib03_interval._attr_entity_category = EntityCategory.CONFIG
         
-        self.calib04_time_start = ZendureRestoreNumber(
-            self, "calib04_time_start", None, None, "Uhr", None,
-            23, 0, NumberMode.BOX
+        # 4. Time Start - PERSISTED!
+        saved_time_start = self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START)
+        self.calib04_time_start = ZendureNumber(
+            self, "calib04_time_start", make_save_callback(CONF_CALIB_TIME_START),
+            None, "Uhr", None, 23, 0, NumberMode.BOX, saved_time_start
         )
         self.calib04_time_start._attr_entity_category = EntityCategory.CONFIG
         
-        self.calib05_time_end = ZendureRestoreNumber(
-            self, "calib05_time_end", None, None, "Uhr", None,
-            23, 0, NumberMode.BOX
+        # 5. Time End - PERSISTED!
+        saved_time_end = self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END)
+        self.calib05_time_end = ZendureNumber(
+            self, "calib05_time_end", make_save_callback(CONF_CALIB_TIME_END),
+            None, "Uhr", None, 23, 0, NumberMode.BOX, saved_time_end
         )
         self.calib05_time_end._attr_entity_category = EntityCategory.CONFIG
         
-        self.calib06_soc_min = ZendureRestoreNumber(
-            self, "calib06_soc_min", None, None, "%", "battery",
-            100, 0, NumberMode.BOX
+        # 6. SoC Min - PERSISTED!
+        saved_soc_min = self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN)
+        self.calib06_soc_min = ZendureNumber(
+            self, "calib06_soc_min", make_save_callback(CONF_CALIB_SOC_MIN),
+            None, "%", "battery", 100, 0, NumberMode.BOX, saved_soc_min
         )
         self.calib06_soc_min._attr_icon = "mdi:battery-low"
         self.calib06_soc_min._attr_entity_category = EntityCategory.CONFIG
         
-        self.calib07_soc_max = ZendureRestoreNumber(
-            self, "calib07_soc_max", None, None, "%", "battery",
-            100, 0, NumberMode.BOX
+        # 7. SoC Max - PERSISTED!
+        saved_soc_max = self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
+        self.calib07_soc_max = ZendureNumber(
+            self, "calib07_soc_max", make_save_callback(CONF_CALIB_SOC_MAX),
+            None, "%", "battery", 100, 0, NumberMode.BOX, saved_soc_max
         )
         self.calib07_soc_max._attr_icon = "mdi:battery-high"
         self.calib07_soc_max._attr_entity_category = EntityCategory.CONFIG
         
-        self.calib08_price_max = ZendureRestoreNumber(
-            self, "calib08_price_max", None, None, "ct/kWh", None,
-            CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX
+        # 8. Price Max - PERSISTED!
+        saved_price = self.config_entry.data.get(CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD)
+        self.calib08_price_max = ZendureNumber(
+            self, "calib08_price_max", make_save_callback(CONF_CALIB_PRICE_THRESHOLD),
+            None, "ct/kWh", None, CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE,
+            NumberMode.BOX, saved_price
         )
         self.calib08_price_max._attr_entity_category = EntityCategory.CONFIG
         
