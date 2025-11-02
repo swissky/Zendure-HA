@@ -162,49 +162,106 @@ class ZendureOptionsFlowHandler(OptionsFlow):
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             return self.async_create_entry(title="", data=data)
 
-        options_schema = vol.Schema({
+        # Check if calibration is enabled to show/hide options
+        calib_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
+        
+        # Base options (always visible)
+        options_schema = {
             vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
             vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
             vol.Required(CONF_SIM, default=self.config_entry.data.get(CONF_SIM, False)): bool,
-            
-            # Auto-Calibration Settings
-            vol.Required(
-                CONF_CALIB_ENABLED, 
-                default=self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
-            ): bool,
-            vol.Optional(
-                CONF_CALIB_PRICE_SENSOR,
-                default=self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="monetary")),
-            vol.Optional(
-                CONF_CALIB_PRICE_THRESHOLD,
-                default=self.config_entry.data.get(CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD)
-            ): vol.All(vol.Coerce(float), vol.Range(min=CalibrationDefaults.MIN_PRICE, max=CalibrationDefaults.MAX_PRICE)),
-            vol.Optional(
-                CONF_CALIB_INTERVAL_DAYS,
-                default=self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
-            ): vol.All(vol.Coerce(int), vol.Range(min=CalibrationDefaults.MIN_INTERVAL_DAYS, max=CalibrationDefaults.MAX_INTERVAL_DAYS)),
-            vol.Optional(
-                CONF_CALIB_TIME_START,
-                default=self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START)
-            ): vol.All(vol.Coerce(int), vol.Range(min=0, max=23)),
-            vol.Optional(
-                CONF_CALIB_TIME_END,
-                default=self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END)
-            ): vol.All(vol.Coerce(int), vol.Range(min=0, max=23)),
-            vol.Optional(
-                CONF_CALIB_SOC_MIN,
-                default=self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN)
-            ): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
-            vol.Optional(
-                CONF_CALIB_SOC_MAX,
-                default=self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
-            ): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
-        })
+            vol.Required(CONF_CALIB_ENABLED, default=calib_enabled): bool,
+        }
+        
+        # Calibration options (only show when enabled)
+        if calib_enabled:
+            options_schema.update({
+                vol.Optional(
+                    CONF_CALIB_PRICE_SENSOR,
+                    description={"suggested_value": self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")},
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["sensor"],
+                        device_class=["monetary"],
+                    )
+                ),
+                vol.Optional(
+                    CONF_CALIB_PRICE_THRESHOLD,
+                    default=self.config_entry.data.get(CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=CalibrationDefaults.MIN_PRICE,
+                        max=CalibrationDefaults.MAX_PRICE,
+                        step=0.5,
+                        unit_of_measurement="ct/kWh",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_CALIB_INTERVAL_DAYS,
+                    default=self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=CalibrationDefaults.MIN_INTERVAL_DAYS,
+                        max=CalibrationDefaults.MAX_INTERVAL_DAYS,
+                        step=1,
+                        unit_of_measurement="days",
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+                vol.Optional(
+                    CONF_CALIB_TIME_START,
+                    default=self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=23,
+                        step=1,
+                        unit_of_measurement="Uhr",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_CALIB_TIME_END,
+                    default=self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=23,
+                        step=1,
+                        unit_of_measurement="Uhr",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_CALIB_SOC_MIN,
+                    default=self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=5,
+                        unit_of_measurement="%",
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+                vol.Optional(
+                    CONF_CALIB_SOC_MAX,
+                    default=self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=5,
+                        unit_of_measurement="%",
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+            })
 
         return self.async_show_form(
             step_id="init",
-            data_schema=self.add_suggested_values_to_schema(options_schema, self.config_entry.data),
+            data_schema=self.add_suggested_values_to_schema(vol.Schema(options_schema), self.config_entry.data),
         )
 
 
