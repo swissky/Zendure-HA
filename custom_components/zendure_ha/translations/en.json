@@ -92,6 +92,24 @@
       "manual_power": {
         "name": "Manual Power"
       },
+      "calib_price_threshold": {
+        "name": "Maximum Price for Calibration"
+      },
+      "calib_interval_days": {
+        "name": "Calibration Interval"
+      },
+      "calib_time_start": {
+        "name": "Off-Peak Start Time"
+      },
+      "calib_time_end": {
+        "name": "Off-Peak End Time"
+      },
+      "calib_soc_min": {
+        "name": "Minimum SoC for Calibration"
+      },
+      "calib_soc_max": {
+        "name": "Maximum SoC for Calibration"
+      },
       "min_soc": {
         "name": "SoC Minimum"
       },
@@ -291,6 +309,9 @@
       "next_calibration_all": {
         "name": "Next Calibration (all devices)"
       },
+      "calib_price_sensor": {
+        "name": "Electricity Price Sensor (optional)"
+      },
       "soft_version": {
         "name": "BMS Firmware"
       },
@@ -350,6 +371,13 @@
           "cloud": "Cloud"
         }
       },
+      "calib_mode": {
+        "name": "Calibration Mode",
+        "state": {
+          "all_together": "All devices together",
+          "individual": "Individual"
+        }
+      },
       "operation": {
         "name": "Operation Mode",
         "state": {
@@ -394,6 +422,9 @@
       }
     },
     "switch": {
+      "calib_enabled": {
+        "name": "Automatic Calibration"
+      },
       "lamp_switch": {
         "name": "LED"
       },

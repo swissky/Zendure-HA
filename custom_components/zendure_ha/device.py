@@ -577,18 +577,12 @@ class ZendureDevice(EntityDevice):
                 )
             return False
 
-    def update_next_calibration(self) -> None:
-        """Calculate and update the next calibration date based on configuration."""
-        from .const import CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults
+    def update_next_calibration(self, interval_days: int = 30) -> None:
+        """Calculate and update the next calibration date based on interval.
         
-        # Get interval from config (default to 30 days)
-        if hasattr(self, 'hass') and self.hass.config_entries:
-            for entry in self.hass.config_entries.async_entries(DOMAIN):
-                interval_days = entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
-                break
-        else:
-            interval_days = CalibrationDefaults.INTERVAL_DAYS
-        
+        Args:
+            interval_days: Number of days until next calibration
+        """
         # Calculate next calibration
         self.next_calibration = self.last_calibration + timedelta(days=interval_days)
         self.nextCalibration.update_value(self.next_calibration.isoformat())

@@ -88,7 +88,45 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
-        # Manager-level calibration entities
+        # Calibration control entities - All settings in Manager device!
+        from .switch import ZendureSwitch
+        
+        self.calibEnabled = ZendureSwitch(self, "calib_enabled", None, None, "switch", CalibrationDefaults.ENABLED)
+        self.calibMode = ZendureRestoreSelect(
+            self, "calib_mode", 
+            {0: "all_together", 1: "individual"}, 
+            None, 
+            0
+        )
+        self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")  # Text entity for sensor name
+        self.calibPriceThreshold = ZendureRestoreNumber(
+            self, "calib_price_threshold", None, None, "ct/kWh", None,
+            CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX, 
+            1, CalibrationDefaults.PRICE_THRESHOLD
+        )
+        self.calibIntervalDays = ZendureRestoreNumber(
+            self, "calib_interval_days", None, None, "days", None,
+            CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
+            NumberMode.SLIDER, 0, CalibrationDefaults.INTERVAL_DAYS
+        )
+        self.calibTimeStart = ZendureRestoreNumber(
+            self, "calib_time_start", None, None, "h", None,
+            23, 0, NumberMode.BOX, 0, CalibrationDefaults.TIME_START
+        )
+        self.calibTimeEnd = ZendureRestoreNumber(
+            self, "calib_time_end", None, None, "h", None,
+            23, 0, NumberMode.BOX, 0, CalibrationDefaults.TIME_END
+        )
+        self.calibSocMin = ZendureRestoreNumber(
+            self, "calib_soc_min", None, None, "%", "battery",
+            100, 0, NumberMode.SLIDER, 0, CalibrationDefaults.SOC_MIN
+        )
+        self.calibSocMax = ZendureRestoreNumber(
+            self, "calib_soc_max", None, None, "%", "battery",
+            100, 0, NumberMode.SLIDER, 0, CalibrationDefaults.SOC_MAX
+        )
+        
+        # Status and control entities
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
         self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
@@ -295,12 +333,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             CalibrationDefaults,
         )
         
-        # Get configuration
-        if not self.config_entry:
-            return
-        
-        # Check if auto-calibration is enabled
-        if not self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED):
+        # Check if auto-calibration is enabled (now from entity instead of config!)
+        if not self.calibEnabled.is_on:
             return
         
         # Check if device is already calibrating
@@ -308,7 +342,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return
         
         # Check interval - only calibrate if enough time has passed
-        interval_days = self.config_entry.data.get(CONF_CALIB_INTERVAL_DAYS, CalibrationDefaults.INTERVAL_DAYS)
+        interval_days = int(self.calibIntervalDays.asNumber)
         if device.last_calibration != datetime.min:
             days_since_last = (datetime.now() - device.last_calibration).days
             if days_since_last < interval_days:
@@ -320,10 +354,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 )
                 return
         
-        # Check time window
+        # Check time window (read from entities!)
         current_hour = datetime.now().hour
-        time_start = self.config_entry.data.get(CONF_CALIB_TIME_START, CalibrationDefaults.TIME_START)
-        time_end = self.config_entry.data.get(CONF_CALIB_TIME_END, CalibrationDefaults.TIME_END)
+        time_start = int(self.calibTimeStart.asNumber)
+        time_end = int(self.calibTimeEnd.asNumber)
         
         if time_start <= time_end:
             # Normal range (e.g. 2-6)
@@ -335,10 +369,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if not in_time_window:
             return
         
-        # Check battery SoC level - calibrate when very low or very high
+        # Check battery SoC level (read from entities!)
         soc = device.electricLevel.asInt
-        soc_min = self.config_entry.data.get(CONF_CALIB_SOC_MIN, CalibrationDefaults.SOC_MIN)
-        soc_max = self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
+        soc_min = int(self.calibSocMin.asNumber)
+        soc_max = int(self.calibSocMax.asNumber)
         
         if not (soc <= soc_min or soc >= soc_max):
             _LOGGER.debug(
@@ -350,16 +384,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             )
             return
         
-        # Check electricity price (if configured)
-        price_sensor = self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")
-        if price_sensor:
+        # Check electricity price (read from entity!)
+        price_sensor = str(self.calibPriceSensor.state) if self.calibPriceSensor.state else ""
+        if price_sensor and price_sensor != "":
             try:
                 price_state = self.hass.states.get(price_sensor)
                 if price_state and price_state.state not in ("unavailable", "unknown"):
                     current_price = float(price_state.state)
-                    price_threshold = self.config_entry.data.get(
-                        CONF_CALIB_PRICE_THRESHOLD, CalibrationDefaults.PRICE_THRESHOLD
-                    )
+                    price_threshold = self.calibPriceThreshold.asNumber
                     
                     if current_price > price_threshold:
                         _LOGGER.debug(
