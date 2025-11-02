@@ -301,7 +301,10 @@
         "name": "Next Calibration (all devices)"
       },
       "calib_price_sensor": {
-        "name": "Price Sensor (opt.)"
+        "name": "Price Sensor (opt.)",
+        "state": {
+          "": "No sensor (time window only)"
+        }
       },
       "soft_version": {
         "name": "BMS Firmware"

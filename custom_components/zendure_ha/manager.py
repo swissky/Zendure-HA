@@ -92,12 +92,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         from homeassistant.helpers.entity import EntityCategory
         from .switch import ZendureSwitch
         
-        # Dummy handler for calibration switch (state is tracked automatically)
-        async def calib_switch_handler(entity: Any, value: Any) -> None:
-            _LOGGER.debug("Calibration enabled changed to: %s", value)
+        # Switch handler that actually updates the state
+        async def calib_switch_handler(entity: ZendureSwitch, value: int) -> None:
+            entity._attr_is_on = bool(value)
+            _LOGGER.info("Auto-Calibration %s", "enabled" if value else "disabled")
         
-        # 1. Enable Switch
-        self.calibEnabled = ZendureSwitch(self, "calib_enabled", calib_switch_handler, None, "switch", CalibrationDefaults.ENABLED)
+        # 1. Enable Switch (with working state!)
+        self.calibEnabled = ZendureSwitch(self, "calib_enabled", calib_switch_handler, None, "switch", False)
         self.calibEnabled._attr_entity_category = EntityCategory.CONFIG
         
         # 2. Mode Selection
@@ -109,7 +110,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.calibMode._attr_entity_category = EntityCategory.CONFIG
         
-        # 3. Interval (BOX not slider!)
+        # 3. Interval (BOX with 'Tage')
         self.calibIntervalDays = ZendureRestoreNumber(
             self, "calib_interval_days", None, None, "Tage", None,
             CalibrationDefaults.MAX_INTERVAL_DAYS, CalibrationDefaults.MIN_INTERVAL_DAYS, 
@@ -117,43 +118,56 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.calibIntervalDays._attr_entity_category = EntityCategory.CONFIG
         
-        # 4. Time Start (BEFORE End!)
+        # 4. Start Time (BEFORE End! - with 'Uhr')
         self.calibTimeStart = ZendureRestoreNumber(
             self, "calib_time_start", None, None, "Uhr", None,
             23, 0, NumberMode.BOX
         )
         self.calibTimeStart._attr_entity_category = EntityCategory.CONFIG
         
-        # 5. Time End (RIGHT AFTER Start!)
+        # 5. End Time (RIGHT AFTER Start! - with 'Uhr')
         self.calibTimeEnd = ZendureRestoreNumber(
             self, "calib_time_end", None, None, "Uhr", None,
             23, 0, NumberMode.BOX
         )
         self.calibTimeEnd._attr_entity_category = EntityCategory.CONFIG
         
-        # 6. SoC Min (BOX not slider!)
+        # 6. Min SoC (BOX with '%')
         self.calibSocMin = ZendureRestoreNumber(
             self, "calib_soc_min", None, None, "%", "battery",
             100, 0, NumberMode.BOX
         )
         self.calibSocMin._attr_entity_category = EntityCategory.CONFIG
         
-        # 7. SoC Max
+        # 7. Max SoC (BOX with '%')
         self.calibSocMax = ZendureRestoreNumber(
             self, "calib_soc_max", None, None, "%", "battery",
             100, 0, NumberMode.BOX
         )
         self.calibSocMax._attr_entity_category = EntityCategory.CONFIG
         
-        # 8. Price Threshold
+        # 8. Max Price (BOX with 'ct/kWh')
         self.calibPriceThreshold = ZendureRestoreNumber(
             self, "calib_price_threshold", None, None, "ct/kWh", None,
             CalibrationDefaults.MAX_PRICE, CalibrationDefaults.MIN_PRICE, NumberMode.BOX
         )
         self.calibPriceThreshold._attr_entity_category = EntityCategory.CONFIG
         
-        # 9. Price Sensor (text input for sensor name)
-        self.calibPriceSensor = ZendureSensor(self, "calib_price_sensor", state="")
+        # 9. Price Sensor (SELECT with available price sensors!)
+        # Build list of available price sensors dynamically
+        price_sensors = {0: "Kein Sensor (nur Zeitfenster)"}
+        sensor_index = 1
+        for state in self.hass.states.async_all("sensor"):
+            if state.attributes.get("device_class") == "monetary":
+                price_sensors[sensor_index] = state.entity_id
+                sensor_index += 1
+        
+        self.calibPriceSensor = ZendureRestoreSelect(
+            self, "calib_price_sensor",
+            price_sensors,
+            None,
+            0  # Default: No sensor
+        )
         self.calibPriceSensor._attr_entity_category = EntityCategory.CONFIG
         
         # Status and control entities (stay in main area)
@@ -414,9 +428,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             )
             return
         
-        # Check electricity price (read from entity!)
-        price_sensor = str(self.calibPriceSensor.state) if self.calibPriceSensor.state else ""
-        if price_sensor and price_sensor != "":
+        # Check electricity price (read from select entity!)
+        # calibPriceSensor.value is the index, we need to get the actual sensor name
+        price_sensor_index = self.calibPriceSensor.value
+        if price_sensor_index and price_sensor_index != 0:
+            # Get the sensor entity_id from the select options
+            price_sensor = self.calibPriceSensor.state  # This is the display value (entity_id)
+            
             try:
                 price_state = self.hass.states.get(price_sensor)
                 if price_state and price_state.state not in ("unavailable", "unknown"):

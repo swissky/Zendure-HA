@@ -301,7 +301,10 @@
         "name": "Nächste Kalibrierung (alle Geräte)"
       },
       "calib_price_sensor": {
-        "name": "Preis-Sensor (opt.)"
+        "name": "Preis-Sensor (opt.)",
+        "state": {
+          "": "Kein Sensor (nur Zeitfenster)"
+        }
       },
       "soft_version": {
         "name": "BMS-Firmware"
