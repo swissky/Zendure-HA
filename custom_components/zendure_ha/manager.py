@@ -154,7 +154,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             # Update next date
             next_date = datetime.now() + timedelta(days=days)
             self.nextCalibrationAll.update_value(next_date.isoformat())
-            self.calibrationStatus.update_value(f"Nächste in {days} Tagen")
             _LOGGER.info("Interval saved: %d days, next: %s", days, next_date.strftime("%Y-%m-%d"))
         
         # Load value from config (persistent storage!)
@@ -228,12 +227,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         # Status and control (main area, not config)
         self.calibrationStatus = ZendureSensor(self, "calibration_status", None, None, None, None)
-        self.calibrationStatus.update_value("Bereit")  # Initialize with ready state
         
         self.nextCalibrationAll = ZendureSensor(self, "next_calibration_all", None, None, "timestamp", None)
-        # Calculate initial next calibration date based on interval
-        next_date = datetime.now() + timedelta(days=CalibrationDefaults.INTERVAL_DAYS)
+        
+        # Initialize status AFTER all entities are created
+        # Calculate next date based on saved interval
+        next_date = datetime.now() + timedelta(days=saved_interval)
         self.nextCalibrationAll.update_value(next_date.isoformat())
+        self.calibrationStatus.update_value("Bereit" if saved_enabled else "Deaktiviert")
         
         self.calibrateAllButton = ZendureButton(self, "calibrate_all_devices", self.button_calibrate_all)
 
