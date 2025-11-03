@@ -17,6 +17,7 @@ CONF_MQTTUSER = "mqttuser"
 CONF_MQTTPSW = "mqttpsw"
 CONF_WIFISSID = "wifissid"
 CONF_WIFIPSW = "wifipsw"
+CONF_GRID_CHARGE_POWER = "grid_charge_power"
 
 # Calibration configuration
 CONF_CALIB_ENABLED = "calib_enabled"
@@ -111,3 +112,8 @@ class CalibrationDefaults:
     MAX_INTERVAL_DAYS = 365  # At most yearly
     MIN_PRICE = 0.0  # Minimum price threshold
     MAX_PRICE = 50.0  # Maximum price threshold (cents/kWh)
+
+
+class GridChargingDefaults:
+    """Default values for grid charging mode."""
+    POWER = 800  # Default charging power from grid (W)
