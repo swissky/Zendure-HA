@@ -100,6 +100,9 @@
       "calib08_price_max": {
         "name": "Preis Max."
       },
+      "grid_charge_power": {
+        "name": "Netzladen Leistung"
+      },
       "input_limit": {
         "name": "Eingangslimit"
       },
@@ -387,7 +390,8 @@
           "manual": "Manuelle Leistungsregelung",
           "smart": "Smarte Leistungsregelung",
           "smart_discharging": "Smartes nur Entladen",
-          "smart_charging": "Smartes nur Laden"
+          "smart_charging": "Smartes nur Laden",
+          "grid_charging": "Netzladen (NT)"
         }
       },
       "pass_mode": {

@@ -82,6 +82,9 @@
       }
     },
     "number": {
+      "grid_charge_power": {
+        "name": "Grid Charging Power"
+      },
       "input_limit": {
         "name": "Input Limit"
       },
@@ -390,7 +393,8 @@
           "manual": "Manual Power",
           "smart": "Smart Matching",
           "smart_discharging": "Smart discharge only",
-          "smart_charging": "Smart charge only"
+          "smart_charging": "Smart charge only",
+          "grid_charging": "Grid Charging (Off-Peak)"
         }
       },
       "pass_mode": {

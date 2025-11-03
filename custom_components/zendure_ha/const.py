@@ -59,6 +59,7 @@ class SmartMode:
     MATCHING = 2
     MATCHING_DISCHARGE = 3
     MATCHING_CHARGE = 4
+    GRID_CHARGING = 5  # New: Charge from grid (for off-peak hours)
     FAST_UPDATE = 100
     MIN_POWER = 50
     START_POWER = 100

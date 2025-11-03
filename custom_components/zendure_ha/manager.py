@@ -37,9 +37,11 @@ from .const import (
     CONF_CALIB_SOC_MIN,
     CONF_CALIB_TIME_END,
     CONF_CALIB_TIME_START,
+    CONF_GRID_CHARGE_POWER,
     CONF_P1METER,
     DOMAIN,
     DeviceState,
+    GridChargingDefaults,
     SmartMode,
 )
 from .device import DeviceSettings, ZendureDevice, ZendureLegacy
@@ -99,8 +101,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return
         self.attr_device_info["sw_version"] = integration.manifest.get("version", "unknown")
 
-        self.operationmode = (ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),)
+        self.operationmode = (ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging", 5: "grid_charging"}, self.update_operation),)
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 10000, -10000, NumberMode.BOX, True)
+        
+        # Grid Charging Power (positive value, will be used as negative for charging)
+        saved_grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
+        async def save_grid_power(_entity: Any, value: Any) -> None:
+            data = self.config_entry.data | {CONF_GRID_CHARGE_POWER: int(value)}
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+        self.gridChargepower = ZendureNumber(self, "grid_charge_power", save_grid_power, None, "W", "power", 3000, 100, NumberMode.BOX, 1, True)
+        self.gridChargepower._attr_native_value = float(saved_grid_power)
+        self.gridChargepower._attr_icon = "mdi:battery-charging"
+        self.gridChargepower._attr_entity_category = EntityCategory.CONFIG
+        
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
@@ -813,6 +826,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     await self.powerDischarge(devices, p1_average, pwr_setpoint)
                 else:
                     await self.powerCharge(devices, p1_average, min(0, pwr_setpoint), issurplus)
+            
+            case SmartMode.GRID_CHARGING:
+                # Grid Charging: Always charge from grid with configured power
+                # Ignores P1 meter, just charges batteries
+                grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
+                _LOGGER.info(f"Grid Charging Mode: Charging with {grid_power}W from grid")
+                await self.powerCharge(devices, 0, -grid_power, False)
 
             case SmartMode.MANUAL:
                 if (setpoint := int(self.manualpower.asNumber)) > 0:
