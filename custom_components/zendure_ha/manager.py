@@ -20,6 +20,7 @@ from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.loader import async_get_integration
@@ -120,7 +121,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # ═══════════════════════════════════════════════════════════
         # CALIBRATION - ALL settings in Manager Device!
         # ═══════════════════════════════════════════════════════════
-        from homeassistant.helpers.entity import EntityCategory
         
         # Helper function to create save callback for config_entry
         def make_save_callback(config_key: str):
