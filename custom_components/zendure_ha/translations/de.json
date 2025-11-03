@@ -388,10 +388,24 @@
         "state": {
           "off": "Aus",
           "manual": "Manuelle Leistungsregelung",
-          "smart": "Smarte Leistungsregelung",
-          "smart_discharging": "Smartes nur Entladen",
-          "smart_charging": "Smartes nur Laden",
+          "smart": "Smart Matching",
+          "smart_discharging": "Smart nur Entladen",
+          "smart_charging": "Smart nur Laden (Überschuss)",
           "grid_charging": "Netzladen"
+        },
+        "state_attributes": {
+          "smart": {
+            "description": "Gleicht P1-Meter aus. Entlädt bei Verbrauch, lädt bei Überschuss."
+          },
+          "smart_charging": {
+            "description": "Lädt NUR bei Überschuss (P1<0). Entlädt NIE. Für SolarFlow ohne Panels."
+          },
+          "smart_discharging": {
+            "description": "Entlädt NUR bei Verbrauch. Lädt NIE. Überschuss geht ins Netz."
+          },
+          "grid_charging": {
+            "description": "Lädt AKTIV vom Netz. Für NT/günstige Stromzeiten."
+          }
         }
       },
       "pass_mode": {

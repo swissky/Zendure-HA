@@ -393,8 +393,22 @@
           "manual": "Manual Power",
           "smart": "Smart Matching",
           "smart_discharging": "Smart discharge only",
-          "smart_charging": "Smart charge only",
+          "smart_charging": "Smart charge only (surplus)",
           "grid_charging": "Grid Charging"
+        },
+        "state_attributes": {
+          "smart": {
+            "description": "Balances P1 meter. Discharges on consumption, charges on surplus."
+          },
+          "smart_charging": {
+            "description": "Charges ONLY on surplus (P1<0). Never discharges. For SolarFlow without panels."
+          },
+          "smart_discharging": {
+            "description": "Discharges ONLY on consumption. Never charges. Surplus goes to grid."
+          },
+          "grid_charging": {
+            "description": "Actively charges from grid. For off-peak/cheap electricity times."
+          }
         }
       },
       "pass_mode": {
