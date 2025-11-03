@@ -17,8 +17,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Set up Zendure as config entry."""
-    # Register custom Lovelace cards
-    await _register_lovelace_cards(hass)
+    # Register custom Lovelace cards (non-blocking)
+    try:
+        _register_lovelace_cards(hass)
+    except Exception as err:
+        _LOGGER.warning(f"Failed to register Lovelace cards: {err}")
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     manager = ZendureManager(hass, entry)
@@ -29,7 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> b
     return True
 
 
-async def _register_lovelace_cards(hass: HomeAssistant) -> None:
+def _register_lovelace_cards(hass: HomeAssistant) -> None:
     """Register custom Lovelace cards."""
     cards_dir = Path(__file__).parent / "www"
     
@@ -47,7 +50,7 @@ async def _register_lovelace_cards(hass: HomeAssistant) -> None:
             hass.http.register_static_path(url, str(card_path), cache_headers=False)
             _LOGGER.info(f"Registered Lovelace card: {url}")
         else:
-            _LOGGER.warning(f"Lovelace card not found: {card_path}")
+            _LOGGER.debug(f"Lovelace card not found: {card_path}")
 
 
 async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
