@@ -394,7 +394,7 @@
           "smart": "Smart Matching",
           "smart_discharging": "Smart discharge only",
           "smart_charging": "Smart charge only",
-          "grid_charging": "Grid Charging (Off-Peak)"
+          "grid_charging": "Grid Charging"
         }
       },
       "pass_mode": {

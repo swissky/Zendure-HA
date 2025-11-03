@@ -391,7 +391,7 @@
           "smart": "Smarte Leistungsregelung",
           "smart_discharging": "Smartes nur Entladen",
           "smart_charging": "Smartes nur Laden",
-          "grid_charging": "Netzladen (NT)"
+          "grid_charging": "Netzladen"
         }
       },
       "pass_mode": {
