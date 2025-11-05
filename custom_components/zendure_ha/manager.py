@@ -821,7 +821,20 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 pwr_produced += d.pwr_produced
                 devices.append(d)
 
-        # Get the setpoint
+        # SPECIAL CASE: Grid Charging Mode ignores P1 meter completely!
+        if self.operation == SmartMode.GRID_CHARGING:
+            grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
+            _LOGGER.info(f"Grid Charging Mode: Charging ALL devices with {grid_power}W from grid (ignoring P1={p1}W)")
+            
+            # Update sensors
+            self.power.update_value(pwr_home + pwr_produced)
+            self.availableKwh.update_value(availEnergy)
+            
+            # Charge all devices directly
+            await self.powerCharge(devices, 0, -grid_power, False)
+            return  # DONE - don't process P1 meter!
+        
+        # Get the setpoint (only for non-grid-charging modes)
         pwr_setpoint = pwr_home + p1
         if issurplus := self.operation == SmartMode.MATCHING and pwr_setpoint > 0 and abs(pwr_bypass) > pwr_setpoint:
             pwr_setpoint += pwr_bypass
@@ -895,13 +908,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     await self.powerDischarge(devices, p1_average, pwr_setpoint)
                 else:
                     await self.powerCharge(devices, p1_average, min(0, pwr_setpoint), issurplus)
-            
-            case SmartMode.GRID_CHARGING:
-                # Grid Charging: Always charge from grid with configured power
-                # Ignores P1 meter, just charges batteries
-                grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
-                _LOGGER.info(f"Grid Charging Mode: Charging with {grid_power}W from grid")
-                await self.powerCharge(devices, 0, -grid_power, False)
 
             case SmartMode.MANUAL:
                 if (setpoint := int(self.manualpower.asNumber)) > 0:
