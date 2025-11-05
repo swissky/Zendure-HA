@@ -831,18 +831,30 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # SPECIAL CASE: Grid Charging Mode ignores P1 meter completely!
         if self.operation == SmartMode.GRID_CHARGING:
-            grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
-            _LOGGER.info(f"Grid Charging Mode: Charging ALL devices with {grid_power}W each from grid (ignoring P1={p1}W)")
+            # Use manual_power as TOTAL limit for all devices
+            total_grid_power = abs(int(self.manualpower.asNumber))
+            _LOGGER.info(f"Grid Charging Mode: Charging with TOTAL {total_grid_power}W distributed across devices (ignoring P1={p1}W)")
             
             # Update sensors
             self.power.update_value(pwr_home + pwr_produced)
             self.availableKwh.update_value(availEnergy)
             
-            # Charge EACH device with FULL grid_power (not distributed!)
-            for device in devices:
-                if device.state != DeviceState.SOCFULL:
-                    await device.power_charge(-grid_power)
-                else:
+            # Distribute total power across non-full devices
+            non_full_devices = [d for d in devices if d.state != DeviceState.SOCFULL]
+            
+            if non_full_devices:
+                # Distribute evenly (simple approach)
+                power_per_device = total_grid_power // len(non_full_devices)
+                _LOGGER.info(f"Distributing {total_grid_power}W across {len(non_full_devices)} devices = {power_per_device}W each")
+                
+                for device in devices:
+                    if device.state != DeviceState.SOCFULL:
+                        await device.power_charge(-power_per_device)
+                    else:
+                        await device.power_off()
+            else:
+                _LOGGER.info("All devices full, stopping grid charging")
+                for device in devices:
                     await device.power_off()
             
             return  # DONE - don't process P1 meter!
