@@ -487,7 +487,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.totalHomeOutput.update_value(total_home_output)
         self.totalGridInput.update_value(total_grid_input)
         
-        _LOGGER.debug(f"Aggregates: Solar={total_solar}W, Available={total_available:.1f}/{total_capacity:.1f}kWh ({total_soc:.0f}%), Home={total_home_output}W, Grid={total_grid_input}W")
+        _LOGGER.info(f"Aggregates: Solar={total_solar}W, Available={total_available:.1f}/{total_capacity:.1f}kWh ({total_soc:.0f}%), Home={total_home_output}W, Grid={total_grid_input}W")
 
     def _update_calibration_status(self) -> None:
         """Update the calibration status display sensors."""
