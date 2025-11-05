@@ -58,39 +58,32 @@ class Hyper2000(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
-        self.mqttInvoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 2,
-                    "autoModelValue": {
-                        "chargingType": 0,
-                        "chargingPower": 0,
-                        "freq": 0,
-                        "outPower": power,
-                    },
-                    "msgType": 1,
-                    "autoModel": 8,
+        
+        # Set acMode=2 (AC Output) and outputLimit directly
+        self.mqttPublish(
+            self.topic_write,
+            {
+                "properties": {
+                    "acMode": 2,  # AC-Ausgangsmodus
+                    "outputLimit": power,  # Discharge power
+                    "smartMode": 1 if power > 0 else 0  # Enable only if power > 0
                 }
-            ],
-            "function": "deviceAutomation",
-        })
+            }
+        )
+        
         return power
 
     async def power_off(self) -> None:
         """Set the power off."""
-        self.mqttInvoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 0,
-                    "autoModelValue": {
-                        "chargingType": 0,
-                        "chargingPower": 0,
-                        "freq": 0,
-                        "outPower": 0,
-                    },
-                    "msgType": 1,
-                    "autoModel": 0,
+        # Turn off both input and output
+        self.mqttPublish(
+            self.topic_write,
+            {
+                "properties": {
+                    "smartMode": 0,
+                    "acMode": 2,  # Default to output mode
+                    "inputLimit": 0,
+                    "outputLimit": 0
                 }
-            ],
-            "function": "deviceAutomation",
-        })
+            }
+        )
