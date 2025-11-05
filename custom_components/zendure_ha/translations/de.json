@@ -101,7 +101,7 @@
         "name": "Preis Max."
       },
       "grid_charge_power": {
-        "name": "Netzladen Leistung"
+        "name": "Netzladen Leistung (Gesamt)"
       },
       "input_limit": {
         "name": "Eingangslimit"

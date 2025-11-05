@@ -105,12 +105,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.operationmode = (ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging", 5: "grid_charging"}, self.update_operation),)
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 10000, -10000, NumberMode.BOX, True)
         
-        # Grid Charging Power (positive value, will be used as negative for charging)
+        # Grid Charging Power - TOTAL limit for all devices (not per device!)
         saved_grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
         async def save_grid_power(_entity: Any, value: Any) -> None:
             data = self.config_entry.data | {CONF_GRID_CHARGE_POWER: int(value)}
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
-        self.gridChargepower = ZendureNumber(self, "grid_charge_power", save_grid_power, None, "W", "power", 3000, 100, NumberMode.BOX, 1, True)
+        self.gridChargepower = ZendureNumber(self, "grid_charge_power", save_grid_power, None, "W", "power", 10000, 100, NumberMode.BOX, 1, True)
         self.gridChargepower._attr_native_value = float(saved_grid_power)
         self.gridChargepower._attr_icon = "mdi:battery-charging"
         self.gridChargepower._attr_entity_category = EntityCategory.CONFIG
@@ -831,8 +831,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # SPECIAL CASE: Grid Charging Mode ignores P1 meter completely!
         if self.operation == SmartMode.GRID_CHARGING:
-            # Use manual_power as TOTAL limit for all devices
-            total_grid_power = abs(int(self.manualpower.asNumber))
+            # Use grid_charge_power as TOTAL limit for all devices
+            total_grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
             _LOGGER.info(f"Grid Charging Mode: Charging with TOTAL {total_grid_power}W distributed across devices (ignoring P1={p1}W)")
             
             # Update sensors
