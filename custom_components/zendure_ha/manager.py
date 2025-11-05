@@ -118,6 +118,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
+        # Aggregate sensors (automatically sum all devices)
+        self.totalSolarPower = ZendureSensor(self, "total_solar_power", None, "W", "power", "measurement", 0)
+        self.totalSolarPower._attr_icon = "mdi:solar-panel"
+        
+        self.totalBatteryCapacity = ZendureSensor(self, "total_battery_capacity", None, "kWh", "energy", "measurement", 1)
+        self.totalBatteryCapacity._attr_icon = "mdi:battery"
+        
+        self.totalHomeOutput = ZendureSensor(self, "total_home_output", None, "W", "power", "measurement", 0)
+        self.totalHomeOutput._attr_icon = "mdi:home"
+        
+        self.totalGridInput = ZendureSensor(self, "total_grid_input", None, "W", "power", "measurement", 0)
+        self.totalGridInput._attr_icon = "mdi:transmission-tower"
+        
         # ═══════════════════════════════════════════════════════════
         # CALIBRATION - ALL settings in Manager Device!
         # ═══════════════════════════════════════════════════════════
@@ -423,6 +436,43 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         _LOGGER.info("Calibration summary: %d started, %d failed, %d offline", calibrated, failed, offline)
 
+    def _update_aggregate_sensors(self) -> None:
+        """Update aggregate sensors by summing all devices."""
+        if not hasattr(self, 'devices') or not self.devices:
+            return
+        
+        total_solar = 0
+        total_capacity = 0
+        total_home_output = 0
+        total_grid_input = 0
+        
+        for device in self.devices:
+            # Sum solar input (nur positive Werte)
+            if hasattr(device, 'solarInput'):
+                solar = device.solarInput.asInt
+                if solar > 0:
+                    total_solar += solar
+            
+            # Sum battery capacity (kWh)
+            if hasattr(device, 'kWh'):
+                total_capacity += device.kWh
+            
+            # Sum home output
+            if hasattr(device, 'homeOutput'):
+                total_home_output += device.homeOutput.asInt
+            
+            # Sum grid input
+            if hasattr(device, 'homeInput'):
+                total_grid_input += device.homeInput.asInt
+        
+        # Update sensors
+        self.totalSolarPower.update_value(total_solar)
+        self.totalBatteryCapacity.update_value(total_capacity)
+        self.totalHomeOutput.update_value(total_home_output)
+        self.totalGridInput.update_value(total_grid_input)
+        
+        _LOGGER.debug(f"Aggregates: Solar={total_solar}W, Capacity={total_capacity}kWh, Home={total_home_output}W, Grid={total_grid_input}W")
+
     def _update_calibration_status(self) -> None:
         """Update the calibration status display sensors."""
         saved_enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
@@ -588,6 +638,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")
         await EntityDevice.add_entities()
+        
+        # Update aggregate sensors (sum all devices)
+        self._update_aggregate_sensors()
 
         def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
             for d in si.manufacturer_data.values():

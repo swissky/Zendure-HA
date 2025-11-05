@@ -1,7 +1,6 @@
 """Initialize the Zendure component."""
 
 import logging
-from pathlib import Path
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -17,12 +16,6 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Set up Zendure as config entry."""
-    # Register custom Lovelace cards (non-blocking)
-    try:
-        _register_lovelace_cards(hass)
-    except Exception as err:
-        _LOGGER.warning(f"Failed to register Lovelace cards: {err}")
-    
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     manager = ZendureManager(hass, entry)
     await manager.loadDevices()
@@ -30,27 +23,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> b
     await manager.async_config_entry_first_refresh()
     entry.async_on_unload(entry.add_update_listener(update_listener))
     return True
-
-
-def _register_lovelace_cards(hass: HomeAssistant) -> None:
-    """Register custom Lovelace cards."""
-    cards_dir = Path(__file__).parent / "www"
-    
-    # Register each card
-    cards = [
-        "zendure-power-flow-card.js",
-        "zendure-battery-overview-card.js",
-        "zendure-quick-control-card.js",
-    ]
-    
-    for card in cards:
-        card_path = cards_dir / card
-        if card_path.exists():
-            url = f"/zendure_ha/{card}"
-            hass.http.register_static_path(url, str(card_path), cache_headers=False)
-            _LOGGER.info(f"Registered Lovelace card: {url}")
-        else:
-            _LOGGER.debug(f"Lovelace card not found: {card_path}")
 
 
 async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
