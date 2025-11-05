@@ -123,7 +123,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.totalSolarPower._attr_icon = "mdi:solar-panel"
         
         self.totalBatteryCapacity = ZendureSensor(self, "total_battery_capacity", None, "kWh", "energy", "measurement", 1)
-        self.totalBatteryCapacity._attr_icon = "mdi:battery"
+        self.totalBatteryCapacity._attr_icon = "mdi:battery-outline"
+        
+        self.totalBatteryAvailable = ZendureSensor(self, "total_battery_available", None, "kWh", "energy", "measurement", 1)
+        self.totalBatteryAvailable._attr_icon = "mdi:battery"
+        
+        self.totalBatterySoc = ZendureSensor(self, "total_battery_soc", None, "%", "battery", "measurement", 0)
+        self.totalBatterySoc._attr_icon = "mdi:battery-50"
         
         self.totalHomeOutput = ZendureSensor(self, "total_home_output", None, "W", "power", "measurement", 0)
         self.totalHomeOutput._attr_icon = "mdi:home"
@@ -443,6 +449,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         total_solar = 0
         total_capacity = 0
+        total_available = 0
         total_home_output = 0
         total_grid_input = 0
         
@@ -457,6 +464,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if hasattr(device, 'kWh'):
                 total_capacity += device.kWh
             
+            # Sum available energy (kWh currently in batteries)
+            if hasattr(device, 'availableKwh'):
+                total_available += device.availableKwh.asNumber
+            
             # Sum home output
             if hasattr(device, 'homeOutput'):
                 total_home_output += device.homeOutput.asInt
@@ -465,13 +476,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if hasattr(device, 'homeInput'):
                 total_grid_input += device.homeInput.asInt
         
+        # Calculate total SoC (%)
+        total_soc = (total_available / total_capacity * 100) if total_capacity > 0 else 0
+        
         # Update sensors
         self.totalSolarPower.update_value(total_solar)
         self.totalBatteryCapacity.update_value(total_capacity)
+        self.totalBatteryAvailable.update_value(total_available)
+        self.totalBatterySoc.update_value(total_soc)
         self.totalHomeOutput.update_value(total_home_output)
         self.totalGridInput.update_value(total_grid_input)
         
-        _LOGGER.debug(f"Aggregates: Solar={total_solar}W, Capacity={total_capacity}kWh, Home={total_home_output}W, Grid={total_grid_input}W")
+        _LOGGER.debug(f"Aggregates: Solar={total_solar}W, Available={total_available:.1f}/{total_capacity:.1f}kWh ({total_soc:.0f}%), Home={total_home_output}W, Grid={total_grid_input}W")
 
     def _update_calibration_status(self) -> None:
         """Update the calibration status display sensors."""
