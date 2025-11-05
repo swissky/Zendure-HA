@@ -524,9 +524,17 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
-
+        
+        old_operation = self.operation
         self.operation = operation
         self.power_history.clear()
+        
+        # When switching FROM grid_charging to another mode, turn off all devices first
+        if old_operation == SmartMode.GRID_CHARGING and operation != SmartMode.GRID_CHARGING:
+            _LOGGER.info("Switching from Grid Charging to another mode - turning off all devices")
+            for d in self.devices:
+                await d.power_off()
+        
         if self.p1meterEvent is not None:
             if operation != SmartMode.NONE and (len(self.devices) == 0 or all(not d.online for d in self.devices)):
                 _LOGGER.warning("No devices online, not possible to start the operation")
@@ -824,14 +832,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # SPECIAL CASE: Grid Charging Mode ignores P1 meter completely!
         if self.operation == SmartMode.GRID_CHARGING:
             grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
-            _LOGGER.info(f"Grid Charging Mode: Charging ALL devices with {grid_power}W from grid (ignoring P1={p1}W)")
+            _LOGGER.info(f"Grid Charging Mode: Charging ALL devices with {grid_power}W each from grid (ignoring P1={p1}W)")
             
             # Update sensors
             self.power.update_value(pwr_home + pwr_produced)
             self.availableKwh.update_value(availEnergy)
             
-            # Charge all devices directly
-            await self.powerCharge(devices, 0, -grid_power, False)
+            # Charge EACH device with FULL grid_power (not distributed!)
+            for device in devices:
+                if device.state != DeviceState.SOCFULL:
+                    await device.power_charge(-grid_power)
+                else:
+                    await device.power_off()
+            
             return  # DONE - don't process P1 meter!
         
         # Get the setpoint (only for non-grid-charging modes)
