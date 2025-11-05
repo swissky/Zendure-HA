@@ -35,24 +35,20 @@ class Hyper2000(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        self.mqttInvoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 1,
-                    "autoModelValue": {
-                        "chargingType": 1,
-                        "price": 2,
-                        "chargingPower": -power,
-                        "prices": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                        "outPower": 0,
-                        "freq": 0,
-                    },
-                    "msgType": 1,
-                    "autoModel": 8,
+        
+        # Hyper 2000 needs DIRECT property setting for reliable grid charging
+        # Set acMode=1 (AC Input) and inputLimit directly
+        self.mqttPublish(
+            self.topic_write,
+            {
+                "properties": {
+                    "acMode": 1,  # AC-Eingangsmodus
+                    "inputLimit": abs(power),  # Positive value
+                    "smartMode": 1  # Enable smart mode
                 }
-            ],
-            "function": "deviceAutomation",
-        })
+            }
+        )
+        
         return power
 
     async def power_discharge(self, power: int) -> int:
