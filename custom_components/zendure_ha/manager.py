@@ -1143,40 +1143,41 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return d.electricLevel.asInt + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
 
         devices.sort(key=sortDischarge, reverse=True)
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, available {self.pwr_total}W, devices {self.pwr_count}")
+        
+        # Calculate current total discharge BEFORE distribution
+        current_total_discharge = sum(d.homeOutput.asInt for d in devices if d.homeOutput.asInt > 0)
+        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, current total: {current_total_discharge}W, available {self.pwr_total}W, devices {self.pwr_count}")
 
         # distribute the power over the devices
         isFirst = True
-        # Don't limit setpoint - we want to reach the target!
-        # setpoint = min(setpoint, self.pwr_total)  # REMOVED - was preventing proper discharge
+        remaining_setpoint = setpoint  # Track remaining setpoint
         
         for d in devices:
             if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(-d.pwr_produced)
-            elif d.online and d.state != DeviceState.SOCFULL and setpoint > 0:
+            elif d.online and d.state != DeviceState.SOCFULL and remaining_setpoint > 0:
                 # Calculate power for this device based on available capacity
                 if self.pwr_count > 1 and self.pwr_total > 0:
                     # Distribute proportionally based on limitDischarge
                     pct = d.limitDischarge / self.pwr_total if self.pwr_total > 0 else 1.0 / self.pwr_count
-                    pwr = min(int(setpoint * pct), d.limitDischarge, setpoint)
+                    pwr = min(int(remaining_setpoint * pct), d.limitDischarge, remaining_setpoint)
                     self.pwr_count -= 1
                     self.pwr_total -= d.limitDischarge
                 else:
                     # Single device or last device - give it all remaining power
-                    pwr = min(setpoint, d.limitDischarge)
+                    pwr = min(remaining_setpoint, d.limitDischarge)
 
                 if pwr > 0:
                     # pwr is the TOTAL discharge we want from this device
-                    # power_discharge will handle delta check internally
                     current_discharge = d.homeOutput.asInt if d.homeOutput.asInt > 0 else 0
                     _LOGGER.info(f"  → {d.name}: Setting discharge to {pwr}W (currently: {current_discharge}W, limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
                     actual_pwr = await d.power_discharge(pwr)
-                    # Reduce setpoint by the DIFFERENCE (how much more we got)
-                    # If device was at 300W and we set 400W, we got 100W more
-                    additional = actual_pwr - current_discharge if actual_pwr > current_discharge else actual_pwr
-                    setpoint = max(0, setpoint - additional)
-                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (additional: {additional}W, remaining setpoint: {setpoint}W)")
+                    # Reduce remaining_setpoint by what we actually got (not just additional)
+                    # This ensures we track total discharge correctly
+                    remaining_setpoint = max(0, remaining_setpoint - actual_pwr)
+                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (remaining setpoint: {remaining_setpoint}W)")
                 else:
+                    # If pwr <= 0, turn off this device
                     await d.power_discharge(0)
             elif average > d.pwr_load or isFirst:
                 await d.power_discharge(SmartMode.STARTWATT)
@@ -1186,5 +1187,5 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             isFirst = False
 
         # Distribution done, remaining power should be zero
-        if setpoint != 0:
-            _LOGGER.warning(f"powerDistribution => left {setpoint}W (devices may be at limit or offline)")
+        if remaining_setpoint != 0:
+            _LOGGER.warning(f"powerDistribution => left {remaining_setpoint}W (devices may be at limit or offline)")
