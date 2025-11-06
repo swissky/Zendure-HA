@@ -570,11 +570,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         
         # Check if auto-calibration is enabled (from config!)
-        if not self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED):
+        enabled = self.config_entry.data.get(CONF_CALIB_ENABLED, CalibrationDefaults.ENABLED)
+        if not enabled:
+            _LOGGER.debug(f"Auto-calibration DISABLED for {device.name}")
             return
         
         # Check if device is already calibrating
         if device.calibration_in_progress or device.socStatus.asInt == 1:
+            _LOGGER.info(f"Auto-calibration SKIPPED for {device.name}: Already calibrating")
             return
         
         # Check interval - only calibrate if enough time has passed (from config!)
@@ -582,13 +585,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if device.last_calibration != datetime.min:
             days_since_last = (datetime.now() - device.last_calibration).days
             if days_since_last < interval_days:
-                _LOGGER.debug(
-                    "Calibration for %s not due yet (%d/%d days)",
-                    device.name,
-                    days_since_last,
-                    interval_days,
+                _LOGGER.info(
+                    f"Auto-calibration SKIPPED for {device.name}: Not due yet ({days_since_last}/{interval_days} days)",
                 )
                 return
+        else:
+            _LOGGER.info(f"Auto-calibration CHECK for {device.name}: Never calibrated before")
         
         # Check time window (read from config!)
         current_hour = datetime.now().hour
@@ -603,7 +605,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             in_time_window = current_hour >= time_start or current_hour < time_end
         
         if not in_time_window:
+            _LOGGER.info(
+                f"Auto-calibration SKIPPED for {device.name}: Outside time window (current: {current_hour}h, window: {time_start}-{time_end}h)"
+            )
             return
+        else:
+            _LOGGER.info(f"Auto-calibration CHECK for {device.name}: In time window ✅ ({time_start}-{time_end}h)")
         
         # Check battery SoC level (read from config!)
         soc = device.electricLevel.asInt
@@ -611,14 +618,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         soc_max = self.config_entry.data.get(CONF_CALIB_SOC_MAX, CalibrationDefaults.SOC_MAX)
         
         if not (soc <= soc_min or soc >= soc_max):
-            _LOGGER.debug(
-                "Calibration for %s: SoC %d%% not in range (<%d%% or >%d%%)",
-                device.name,
-                soc,
-                soc_min,
-                soc_max,
+            _LOGGER.info(
+                f"Auto-calibration SKIPPED for {device.name}: SoC {soc}% not in range (<{soc_min}% or >{soc_max}%)"
             )
             return
+        else:
+            _LOGGER.info(f"Auto-calibration CHECK for {device.name}: SoC {soc}% OK ✅ (<{soc_min}% or >{soc_max}%)")
         
         # Check electricity price (read from config!)
         price_sensor = self.config_entry.data.get(CONF_CALIB_PRICE_SENSOR, "")
@@ -649,15 +654,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # Continue anyway if price sensor fails
         
         # All conditions met - trigger calibration!
-        _LOGGER.info(
-            "Auto-calibration triggered for %s (SoC: %d%%, Hour: %d, Days since last: %s)",
-            device.name,
-            soc,
-            current_hour,
-            "never" if device.last_calibration == datetime.min else str((datetime.now() - device.last_calibration).days),
-        )
+        days_text = "never" if device.last_calibration == datetime.min else f"{(datetime.now() - device.last_calibration).days} days ago"
         
-        await device.start_calibration(manual=False)
+        _LOGGER.info(f"═══ AUTO-CALIBRATION TRIGGERED ═══")
+        _LOGGER.info(f"Device: {device.name}")
+        _LOGGER.info(f"  SoC: {soc}%")
+        _LOGGER.info(f"  Hour: {current_hour}h (window: {time_start}-{time_end}h)")
+        _LOGGER.info(f"  Last calibration: {days_text}")
+        _LOGGER.info(f"  Starting calibration now...")
+        
+        success = await device.start_calibration(manual=False)
+        
+        if success:
+            _LOGGER.info(f"Auto-calibration STARTED for {device.name} ✅")
+        else:
+            _LOGGER.error(f"Auto-calibration FAILED for {device.name} ❌")
 
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")
