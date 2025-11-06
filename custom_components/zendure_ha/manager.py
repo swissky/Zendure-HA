@@ -874,8 +874,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if ZendureManager.simulation:
             self.writeSimulation(time, p1)
 
-        # Check for fast delay
-        if time < self.zero_fast:
+        # Check for emergency response (very large changes >2kW)
+        # This bypasses all delays for immediate response
+        p1_change = abs(p1 - (self.p1_history[-1] if self.p1_history else p1))
+        is_emergency = p1_change > SmartMode.VERY_LARGE_CHANGE_THRESHOLD
+        
+        # Check for large change (>1kW) - use faster response
+        is_large_change = p1_change > SmartMode.LARGE_CHANGE_THRESHOLD
+        
+        # Check for fast delay (skip if emergency)
+        if not is_emergency and time < self.zero_fast:
             self.p1_history.append(p1)
             return
 
@@ -889,11 +897,28 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             isFast = False
         self.p1_history.append(p1)
 
+        # Determine update urgency
+        # Emergency: >2kW change -> immediate response (0.3s)
+        # Large: >1kW change -> fast response (1.0s)
+        # Normal: standard deviation -> fast response (1.0s)
+        # Otherwise: normal response (4.0s)
+        if is_emergency:
+            update_interval = SmartMode.TIMEEMERGENCY
+            isFast = True
+            _LOGGER.warning(f"P1 EMERGENCY: {p1_change}W change detected (P1={p1}W) - immediate response!")
+        elif is_large_change or isFast:
+            update_interval = SmartMode.TIMEFAST
+            isFast = True
+            _LOGGER.info(f"P1 LARGE CHANGE: {p1_change}W change detected (P1={p1}W) - fast response")
+        else:
+            update_interval = SmartMode.TIMEZERO
+            isFast = False
+
         # check minimal time between updates
-        if isFast or time > self.zero_next:
+        if is_emergency or is_large_change or isFast or time > self.zero_next:
             try:
                 self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
-                self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
+                self.zero_fast = time + timedelta(seconds=update_interval)
                 await self.powerChanged(p1, isFast)
             except Exception as err:
                 _LOGGER.error(err)
@@ -1146,7 +1171,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         
         # Calculate current total discharge BEFORE distribution
         current_total_discharge = sum(d.homeOutput.asInt for d in devices if d.homeOutput.asInt > 0)
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, current total: {current_total_discharge}W, available {self.pwr_total}W, devices {self.pwr_count}")
+        
+        # For large setpoints (>1kW), prioritize maximum discharge for faster response
+        # This helps when Wärmepumpe/Backofen suddenly starts
+        is_large_setpoint = setpoint > SmartMode.LARGE_CHANGE_THRESHOLD
+        
+        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, current total: {current_total_discharge}W, available {self.pwr_total}W, devices {self.pwr_count}, large_setpoint={is_large_setpoint}")
 
         # distribute the power over the devices
         isFirst = True
@@ -1156,9 +1186,20 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(-d.pwr_produced)
             elif d.online and d.state != DeviceState.SOCFULL and remaining_setpoint > 0:
-                # Calculate power for this device based on available capacity
-                if self.pwr_count > 1 and self.pwr_total > 0:
-                    # Distribute proportionally based on limitDischarge
+                # For large setpoints, prioritize maximum discharge per device for faster response
+                if is_large_setpoint and self.pwr_count > 1:
+                    # Give each device its maximum capacity first, then distribute remainder
+                    # This ensures all devices ramp up quickly
+                    if remaining_setpoint > d.limitDischarge:
+                        # Still need more - give this device its max
+                        pwr = d.limitDischarge
+                    else:
+                        # Remaining setpoint is less than this device's capacity
+                        pwr = remaining_setpoint
+                    self.pwr_count -= 1
+                    self.pwr_total -= d.limitDischarge
+                elif self.pwr_count > 1 and self.pwr_total > 0:
+                    # Normal proportional distribution
                     pct = d.limitDischarge / self.pwr_total if self.pwr_total > 0 else 1.0 / self.pwr_count
                     pwr = min(int(remaining_setpoint * pct), d.limitDischarge, remaining_setpoint)
                     self.pwr_count -= 1

@@ -67,17 +67,22 @@ class SmartMode:
     START_POWER = 100
     
     # Timing constants (in seconds)
-    TIMEFAST = 2.2  # Fast update interval after significant change
+    TIMEFAST = 1.0  # Fast update interval after significant change (reduced from 2.2s for faster response)
     TIMEZERO = 4  # Normal update interval
     TIMEIDLE = 10  # Idle time
     TIMERESET = 150  # Reset time
     MIN_SWITCH_INTERVAL = 30  # Minimum seconds between mode changes to prevent oscillation
+    TIMEEMERGENCY = 0.3  # Emergency update interval for very large changes (>1kW)
     
     # Standard deviation thresholds for detecting significant changes
     Threshold = 3.5  # Multiplier for P1 meter stddev calculation
     ThresholdAvg = 3.5  # Multiplier for power average stddev calculation
     MAX_STDDEV_THRESHOLD = 15  # Minimum stddev value for P1 changes (watts)
     MAX_STDDEV_THRESHOLD_AVG = 20  # Minimum stddev value for power average (watts)
+    
+    # Large change thresholds for emergency response
+    LARGE_CHANGE_THRESHOLD = 1000  # Watts - trigger emergency response for changes >1kW
+    VERY_LARGE_CHANGE_THRESHOLD = 2000  # Watts - trigger immediate response for changes >2kW
     
     P1_MIN_UPDATE = timedelta(milliseconds=400)
     
