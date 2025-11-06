@@ -118,6 +118,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
         
+        # DEBUG SENSOR - Shows last P1 value and timestamp
+        self.debugP1Sensor = ZendureSensor(self, "debug_p1_last", None, None, None, None)
+        self.debugP1Sensor._attr_icon = "mdi:chart-line"
+        
+        # DEBUG SENSOR - Shows Grid Charging status
+        self.debugGridCharging = ZendureSensor(self, "debug_grid_charging", None, None, None, None)
+        self.debugGridCharging._attr_icon = "mdi:battery-charging"
+        
         # Aggregate sensors (automatically sum all devices)
         self.totalSolarPower = ZendureSensor(self, "total_solar_power", None, "W", "power", "measurement", 0)
         self.totalSolarPower._attr_icon = "mdi:solar-panel"
@@ -859,9 +867,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # Distribute evenly (simple approach)
                 power_per_device = total_grid_power // len(non_full_devices)
                 
-                # FORCE visible logs
-                print(f"[ZENDURE] ═══ GRID CHARGING MODE ═══")
-                print(f"[ZENDURE] Total Power: {total_grid_power}W | Non-full devices: {len(non_full_devices)} | Per device: {power_per_device}W")
+                # Update DEBUG sensor
+                import datetime
+                timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                self.debugGridCharging.update_value(f"{total_grid_power}W → {len(non_full_devices)} Geräte ({power_per_device}W each) @ {timestamp}")
+                
                 _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
                 _LOGGER.info(f"Total Power: {total_grid_power}W | Non-full devices: {len(non_full_devices)} | Per device: {power_per_device}W")
                 _LOGGER.info(f"Ignoring P1 meter (currently: {p1}W)")
@@ -940,11 +950,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.last_mode = current_mode
             self.last_mode_change = time
 
+        # Update DEBUG sensor to show P1 activity
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        self.debugP1Sensor.update_value(f"P1={p1}W setpoint={pwr_setpoint}W @ {timestamp}")
+        
         # Update power distribution.
-        # FORCE visible log with print fallback
-        log_msg = f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W"
-        _LOGGER.info(log_msg)
-        print(f"[ZENDURE] {log_msg}")  # Fallback to ensure visibility
+        _LOGGER.info(f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W")
         match self.operation:
             case SmartMode.MATCHING:
                 if pwr_setpoint >= 0:
