@@ -32,9 +32,14 @@ class Hyper2000(ZendureLegacy):
         """Set charge power."""
         if abs(power - self.pwr_home) <= 1:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
+            self.deviceAction.update_value("Standby (kein Delta)")
             return power
 
-        _LOGGER.info(f"Power charge {self.name} => {power}")
+        _LOGGER.info(f"Power charge {self.name} => {power} (Setting acMode=1, inputLimit={abs(power)})")
+        
+        # Update debug sensors
+        self.deviceAction.update_value(f"Laden vom Netz")
+        self.lastPowerCommand.update_value(power)
         
         # Hyper 2000 needs DIRECT property setting for reliable grid charging
         # Set acMode=1 (AC Input) and inputLimit directly
@@ -55,9 +60,18 @@ class Hyper2000(ZendureLegacy):
         """Set discharge power."""
         if abs(power - self.pwr_home) <= 1:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
+            self.deviceAction.update_value("Standby (kein Delta)")
             return power
 
-        _LOGGER.info(f"Power discharge {self.name} => {power}")
+        _LOGGER.info(f"Power discharge {self.name} => {power} (Setting acMode=2, outputLimit={power})")
+        
+        # Update debug sensors
+        if power > 0:
+            self.deviceAction.update_value(f"Entladen ans Haus")
+            self.lastPowerCommand.update_value(power)
+        else:
+            self.deviceAction.update_value("Standby")
+            self.lastPowerCommand.update_value(0)
         
         # Set acMode=2 (AC Output) and outputLimit directly
         self.mqttPublish(
@@ -75,6 +89,12 @@ class Hyper2000(ZendureLegacy):
 
     async def power_off(self) -> None:
         """Set the power off."""
+        _LOGGER.info(f"Power off {self.name} (Setting smartMode=0, limits=0)")
+        
+        # Update debug sensors
+        self.deviceAction.update_value("Aus")
+        self.lastPowerCommand.update_value(0)
+        
         # Turn off both input and output
         self.mqttPublish(
             self.topic_write,

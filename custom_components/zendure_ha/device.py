@@ -138,6 +138,14 @@ class ZendureDevice(EntityDevice):
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
+        
+        # Debug sensor - shows what device is currently doing
+        self.deviceAction = ZendureSensor(self, "device_action", None, None, None, None)
+        self.deviceAction._attr_icon = "mdi:information"
+        
+        # Debug sensor - last power command sent
+        self.lastPowerCommand = ZendureSensor(self, "last_power_command", None, "W", "power", "measurement")
+        self.lastPowerCommand._attr_icon = "mdi:flash"
 
         self.aggrCharge = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrDischarge = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
