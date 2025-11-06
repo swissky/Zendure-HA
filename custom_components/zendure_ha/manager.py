@@ -1077,14 +1077,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.debugP1Sensor.update_value(f"P1={p1}W setpoint={pwr_setpoint}W @ {timestamp}")
         
-        # Calculate what we need: setpoint is TOTAL discharge needed
-        # If devices already discharge total_home_output, we need (setpoint - total_home_output) more
-        # But actually, setpoint already accounts for this, so we just need to reach setpoint total
-        additional_needed = pwr_setpoint - total_home_output if pwr_setpoint > total_home_output else 0
-        
         # Update power distribution.
-        _LOGGER.info(f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W, current_total:{total_home_output}W, additional_needed:{additional_needed}W, produced:{pwr_produced}W")
-        print(f"[ZENDURE] P1={p1}W setpoint={pwr_setpoint}W current={total_home_output}W additional={additional_needed}W")
+        _LOGGER.info(f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W")
         match self.operation:
             case SmartMode.MATCHING:
                 if pwr_setpoint >= 0:
