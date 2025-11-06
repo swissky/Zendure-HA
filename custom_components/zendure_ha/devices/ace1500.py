@@ -18,13 +18,18 @@ class ACE1500(ZendureLegacy):
         self.limitDischarge = 800
         self.maxSolar = -900
 
-    async def power_charge(self, power: int) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= 1:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
+    async def power_charge(self, power: int, force: bool = False) -> int:
+        """Set charge power.
+        
+        Args:
+            power: Power to charge (negative value)
+            force: Skip delta check (for grid charging)
+        """
+        if not force and abs(power - self.pwr_home) <= 1:
+            _LOGGER.info(f"Power charge {self.name} => no action [power {power}, delta too small]")
             return power
 
-        _LOGGER.info(f"Power charge {self.name} => {power}")
+        _LOGGER.info(f"Power charge {self.name} => {power} (force={force})")
         self.mqttInvoke({
             "arguments": [
                 {

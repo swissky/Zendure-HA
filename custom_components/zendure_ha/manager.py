@@ -938,10 +938,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 for device in non_full_devices:
                     _LOGGER.info(f"  → {device.name}: Charging with {power_per_device}W (SoC: {device.electricLevel.asInt}%, Online: {device.online})")
                     # Force=True to skip delta check (devices might already charge from panels or have no solar)
-                    if hasattr(device.power_charge, '__code__') and 'force' in device.power_charge.__code__.co_varnames:
-                        await device.power_charge(-power_per_device, force=True)
-                    else:
-                        await device.power_charge(-power_per_device)
+                    # All devices now support force parameter
+                    await device.power_charge(-power_per_device, force=True)
                 
                 # Turn off FULL or OFFLINE devices
                 for device in devices:

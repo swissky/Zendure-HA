@@ -22,13 +22,18 @@ class Hub2000(ZendureLegacy):
         self.powerMin = -1800 if len(batteries) > 1 else -1200 if batteries[0].kWh > 1 else -800
         self.limitInput.update_range(0, abs(self.powerMin))
 
-    async def power_charge(self, power: int) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= 1:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
+    async def power_charge(self, power: int, force: bool = False) -> int:
+        """Set charge power.
+        
+        Args:
+            power: Power to charge (negative value)
+            force: Skip delta check (for grid charging)
+        """
+        if not force and abs(power - self.pwr_home) <= 1:
+            _LOGGER.info(f"Power charge {self.name} => no action [power {power}, delta too small]")
             return power
 
-        _LOGGER.info(f"Power charge {self.name} => {power}")
+        _LOGGER.info(f"Power charge {self.name} => {power} (force={force})")
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 2, "autoModelValue": power, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",

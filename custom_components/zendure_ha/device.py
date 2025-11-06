@@ -682,13 +682,19 @@ class ZendureZenSdk(ZendureDevice):
 
         return await super().power_get()
 
-    async def power_charge(self, power: int, _off: bool = False) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
+    async def power_charge(self, power: int, _off: bool = False, force: bool = False) -> int:
+        """Set charge power.
+        
+        Args:
+            power: Power to charge (negative value)
+            _off: Unused parameter (for compatibility)
+            force: Skip delta check (for grid charging)
+        """
+        if not force and abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
             return power
 
-        _LOGGER.info(f"Power charge {self.name} => {power}")
+        _LOGGER.info(f"Power charge {self.name} => {power} (force={force})")
         await self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 1, "inputLimit": -power}})
         return power
 
