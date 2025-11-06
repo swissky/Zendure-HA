@@ -1182,64 +1182,47 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # This helps when Wärmepumpe/Backofen suddenly starts
         is_large_setpoint = setpoint > SmartMode.LARGE_CHANGE_THRESHOLD
         
-        # IMPORTANT: setpoint is the TARGET TOTAL discharge we want
-        # If devices already discharge current_total_discharge, we need (setpoint - current_total_discharge) more
-        # remaining_setpoint tracks how much ADDITIONAL discharge we still need
-        additional_needed = setpoint - current_total_discharge if setpoint > current_total_discharge else 0
-        
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W (TARGET TOTAL), current total: {current_total_discharge}W, additional needed: {additional_needed}W, available {self.pwr_total}W, devices {self.pwr_count}, large_setpoint={is_large_setpoint}")
+        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, current total: {current_total_discharge}W, available {self.pwr_total}W, devices {self.pwr_count}, large_setpoint={is_large_setpoint}")
 
         # distribute the power over the devices
         isFirst = True
-        # Track how much ADDITIONAL discharge we still need
-        # We start with the additional needed and reduce by the increase we get from each device
-        remaining_setpoint = additional_needed  # This is how much MORE we need beyond current_total_discharge
+        remaining_setpoint = setpoint  # Track remaining setpoint
         
         for d in devices:
             if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(-d.pwr_produced)
             elif d.online and d.state != DeviceState.SOCFULL and remaining_setpoint > 0:
-                # Calculate target power for this device
-                # We want: current_discharge + share_of_remaining_setpoint
-                current_discharge = d.homeOutput.asInt if d.homeOutput.asInt > 0 else 0
-                
                 # For large setpoints, prioritize maximum discharge per device for faster response
                 if is_large_setpoint and self.pwr_count > 1:
                     # Give each device its maximum capacity first, then distribute remainder
                     # This ensures all devices ramp up quickly
-                    # Target = current + min(remaining_setpoint, available_capacity)
-                    available_capacity = d.limitDischarge - current_discharge
-                    additional_for_device = min(remaining_setpoint, available_capacity)
-                    pwr = current_discharge + additional_for_device
-                    # Don't exceed device limit
-                    pwr = min(pwr, d.limitDischarge)
+                    if remaining_setpoint > d.limitDischarge:
+                        # Still need more - give this device its max
+                        pwr = d.limitDischarge
+                    else:
+                        # Remaining setpoint is less than this device's capacity
+                        pwr = remaining_setpoint
                     self.pwr_count -= 1
                     self.pwr_total -= d.limitDischarge
                 elif self.pwr_count > 1 and self.pwr_total > 0:
                     # Normal proportional distribution
-                    # Distribute remaining_setpoint proportionally
                     pct = d.limitDischarge / self.pwr_total if self.pwr_total > 0 else 1.0 / self.pwr_count
-                    additional_for_device = min(int(remaining_setpoint * pct), d.limitDischarge - current_discharge, remaining_setpoint)
-                    pwr = current_discharge + additional_for_device
-                    # Don't exceed device limit
-                    pwr = min(pwr, d.limitDischarge)
+                    pwr = min(int(remaining_setpoint * pct), d.limitDischarge, remaining_setpoint)
                     self.pwr_count -= 1
                     self.pwr_total -= d.limitDischarge
                 else:
                     # Single device or last device - give it all remaining power
-                    additional_for_device = min(remaining_setpoint, d.limitDischarge - current_discharge)
-                    pwr = current_discharge + additional_for_device
+                    pwr = min(remaining_setpoint, d.limitDischarge)
 
                 if pwr > 0:
-                    # pwr is the TARGET TOTAL discharge we want from this device
-                    _LOGGER.info(f"  → {d.name}: Setting discharge to {pwr}W (currently: {current_discharge}W, additional: {pwr - current_discharge}W, limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
+                    # pwr is the TOTAL discharge we want from this device
+                    current_discharge = d.homeOutput.asInt if d.homeOutput.asInt > 0 else 0
+                    _LOGGER.info(f"  → {d.name}: Setting discharge to {pwr}W (currently: {current_discharge}W, limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
                     actual_pwr = await d.power_discharge(pwr)
-                    # Reduce remaining_setpoint by the INCREASE we got
-                    # remaining_setpoint tracks how much ADDITIONAL we still need
-                    # So we reduce by the increase (actual - current)
-                    increase = actual_pwr - current_discharge if actual_pwr > current_discharge else 0
-                    remaining_setpoint = max(0, remaining_setpoint - increase)
-                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (was {current_discharge}W, increase: {increase}W, remaining additional: {remaining_setpoint}W)")
+                    # Reduce remaining_setpoint by what we actually got (not just additional)
+                    # This ensures we track total discharge correctly
+                    remaining_setpoint = max(0, remaining_setpoint - actual_pwr)
+                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (remaining setpoint: {remaining_setpoint}W)")
                 else:
                     # If pwr <= 0, turn off this device
                     await d.power_discharge(0)
@@ -1250,14 +1233,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             average -= d.pwr_load
             isFirst = False
 
-        # Distribution done, check if we reached the target
-        final_total_discharge = sum(d.homeOutput.asInt for d in devices if d.homeOutput.asInt > 0)
-        setpoint_achieved = abs(final_total_discharge - (setpoint + current_total_discharge - setpoint)) < 100  # Allow 100W tolerance
-        
+        # Distribution done, remaining power should be zero
         if remaining_setpoint != 0:
             _LOGGER.warning(f"powerDistribution => left {remaining_setpoint}W (devices may be at limit or offline)")
-            _LOGGER.warning(f"powerDistribution => final_total:{final_total_discharge}W, target:{setpoint}W, gap:{setpoint - final_total_discharge}W")
-            print(f"[ZENDURE] WARNING: Setpoint not fully met! Target={setpoint}W, Actual={final_total_discharge}W, Gap={setpoint - final_total_discharge}W")
-        else:
-            _LOGGER.info(f"powerDistribution => SUCCESS! Target={setpoint}W, Final={final_total_discharge}W")
-            print(f"[ZENDURE] Setpoint achieved! Target={setpoint}W, Final={final_total_discharge}W")
