@@ -18,6 +18,7 @@ CONF_MQTTPSW = "mqttpsw"
 CONF_WIFISSID = "wifissid"
 CONF_WIFIPSW = "wifipsw"
 CONF_GRID_CHARGE_POWER = "grid_charge_power"
+CONF_TARGET_EXPORT = "target_export"  # Target export power for Smart Matching (W)
 
 # Calibration configuration
 CONF_CALIB_ENABLED = "calib_enabled"
@@ -117,3 +118,8 @@ class CalibrationDefaults:
 class GridChargingDefaults:
     """Default values for grid charging mode."""
     POWER = 800  # Default charging power from grid (W)
+
+
+class SmartMatchingDefaults:
+    """Default values for Smart Matching mode."""
+    TARGET_EXPORT = 50  # Default target export power (W) - aim for 50W export instead of 0W

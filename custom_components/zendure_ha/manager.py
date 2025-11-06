@@ -973,18 +973,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Use totalHomeOutput sensor value (NETTO output: output - input from all devices)
         # This is updated in _update_aggregate_sensors() which calculates NETTO power
         # 
-        # P1 SENSOR INTERPRETATION (user-defined):
+        # P1 SENSOR INTERPRETATION (user-defined, e.g. sensor.gplugd_z_pi):
         # - Positive P1 = Import from grid (need to discharge more to compensate)
         # - Negative P1 = Export to grid (need to discharge less or charge)
         # 
-        # Setpoint calculation:
-        # pwr_setpoint = total NETTO discharge needed to make P1 = 0
+        # Setpoint calculation with target export:
+        # pwr_setpoint = total NETTO discharge needed to achieve target export (default: 50W)
         # If totalHomeOutput = 1465W (netto output) and p1 = 263W (import),
-        # then setpoint = 1465 + 263 = 1728W (total needed to eliminate import)
+        # then setpoint = 1465 + 263 - 50 = 1678W (to achieve 50W export, not 0W)
         # 
         # IMPORTANT: totalHomeOutput is now NETTO (output - input), not raw output!
         total_home_output = int(self.totalHomeOutput.asNumber) if hasattr(self, 'totalHomeOutput') else pwr_home
-        pwr_setpoint = total_home_output + p1  # Add P1 to compensate (if P1 is import, we need more discharge)
+        target_export = self.config_entry.data.get(CONF_TARGET_EXPORT, SmartMatchingDefaults.TARGET_EXPORT)
+        pwr_setpoint = total_home_output + p1 - target_export  # Subtract target export to achieve small export instead of 0
         if issurplus := self.operation == SmartMode.MATCHING and pwr_setpoint > 0 and abs(pwr_bypass) > pwr_setpoint:
             pwr_setpoint += pwr_bypass
         elif pwr_setpoint < 0 and pwr_setpoint < pwr_produced + pwr_bypass:
