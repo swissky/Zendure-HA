@@ -734,13 +734,57 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     def update_p1meter(self, p1meter: str | None) -> None:
         """Update the P1 meter sensor."""
-        _LOGGER.debug("Updating P1 meter to: %s", p1meter)
+        _LOGGER.info(f"Updating P1 meter to: {p1meter}")  # Changed to INFO!
+        
+        # Cancel old event tracker
         if self.p1meterEvent:
             self.p1meterEvent()
-        if p1meter:
-            self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed)
-        else:
             self.p1meterEvent = None
+        
+        # Cancel old polling
+        if hasattr(self, 'p1_polling_cancel') and self.p1_polling_cancel:
+            self.p1_polling_cancel()
+            self.p1_polling_cancel = None
+        
+        if p1meter:
+            # Try event-based first (efficient)
+            try:
+                self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed)
+                _LOGGER.info(f"P1 meter event tracker registered for {p1meter}")
+            except Exception as e:
+                _LOGGER.error(f"Failed to register P1 event tracker: {e}")
+            
+            # FALLBACK: Polling every 10 seconds (always works!)
+            from homeassistant.helpers.event import async_track_time_interval
+            
+            async def _p1_poll(_now):
+                """Poll P1 sensor value every 10 seconds."""
+                state = self.hass.states.get(p1meter)
+                if state and state.state not in ("unknown", "unavailable"):
+                    try:
+                        # Simulate state change event
+                        from homeassistant.core import Event, EventStateChangedData
+                        event_data = EventStateChangedData(
+                            entity_id=p1meter,
+                            old_state=None,
+                            new_state=state
+                        )
+                        fake_event = Event(
+                            "state_changed",
+                            event_data,
+                        )
+                        await self._p1_changed(fake_event)
+                    except Exception as e:
+                        _LOGGER.error(f"P1 polling error: {e}")
+            
+            self.p1_polling_cancel = async_track_time_interval(
+                self.hass,
+                _p1_poll,
+                timedelta(seconds=10)
+            )
+            _LOGGER.info(f"P1 meter polling started (every 10s) for {p1meter}")
+        else:
+            _LOGGER.warning("No P1 meter configured!")
 
     def writeSimulation(self, time: datetime, p1: int) -> None:
         if Path("simulation.csv").exists() is False:
