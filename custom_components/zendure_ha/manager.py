@@ -545,6 +545,17 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.info("Switching from Grid Charging to another mode - turning off all devices")
             for d in self.devices:
                 await d.power_off()
+            
+            # Force immediate P1 update to activate new mode
+            if self.p1meterEvent is not None and operation == SmartMode.MATCHING:
+                _LOGGER.info("Forcing immediate P1 update to activate Smart Matching")
+                p1_sensor = self.hass.states.get(self.config_entry.data.get(CONF_P1METER, "sensor.power_actual"))
+                if p1_sensor and p1_sensor.state not in ("unknown", "unavailable"):
+                    try:
+                        p1_value = int(float(p1_sensor.state))
+                        await self.powerChanged(p1_value, True)
+                    except (ValueError, TypeError):
+                        pass
         
         if self.p1meterEvent is not None:
             if operation != SmartMode.NONE and (len(self.devices) == 0 or all(not d.online for d in self.devices)):
