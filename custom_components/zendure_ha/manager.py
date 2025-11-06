@@ -923,8 +923,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 power_per_device = total_grid_power // len(non_full_devices)
                 
                 # Update DEBUG sensor
-                import datetime
-                timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                timestamp = datetime.now().strftime("%H:%M:%S")
                 self.debugGridCharging.update_value(f"{total_grid_power}W → {len(non_full_devices)} Geräte ({power_per_device}W each) @ {timestamp}")
                 
                 _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
@@ -1006,8 +1005,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.last_mode_change = time
 
         # Update DEBUG sensor to show P1 activity
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        timestamp = datetime.now().strftime("%H:%M:%S")
         self.debugP1Sensor.update_value(f"P1={p1}W setpoint={pwr_setpoint}W @ {timestamp}")
         
         # Update power distribution.
