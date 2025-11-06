@@ -959,11 +959,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return  # DONE - don't process P1 meter!
         
         # Get the setpoint (only for non-grid-charging modes)
+        # pwr_setpoint = total discharge needed to make P1 = 0
+        # If pwr_home = 1465W (already discharging) and p1 = 263W (import),
+        # then setpoint = 1465 + 263 = 1728W (total needed)
         pwr_setpoint = pwr_home + p1
         if issurplus := self.operation == SmartMode.MATCHING and pwr_setpoint > 0 and abs(pwr_bypass) > pwr_setpoint:
             pwr_setpoint += pwr_bypass
         elif pwr_setpoint < 0 and pwr_setpoint < pwr_produced + pwr_bypass:
             pwr_setpoint += pwr_produced
+        
+        # For Smart Matching: setpoint is the TOTAL discharge needed
+        # But we need to calculate ADDITIONAL discharge needed
+        # If devices already discharge pwr_home, we need (setpoint - pwr_home) more
+        # But actually, setpoint already includes pwr_home, so we just need setpoint total
+        # The issue is: powerDischarge receives setpoint but devices might already be discharging
+        # So we need to ensure powerDischarge sets the TOTAL, not ADDITIONAL
 
         # Update the power entities
         self.power.update_value(pwr_home + pwr_produced)
@@ -1131,9 +1141,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     pwr = min(setpoint, d.limitDischarge)
 
                 if pwr > 0:
-                    _LOGGER.info(f"  → {d.name}: Discharging {pwr}W (limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
-                    pwr = await d.power_discharge(pwr)
-                    setpoint = max(0, setpoint - pwr)
+                    # pwr is the TOTAL discharge we want from this device
+                    # power_discharge will handle delta check internally
+                    current_discharge = d.homeOutput.asInt if d.homeOutput.asInt > 0 else 0
+                    _LOGGER.info(f"  → {d.name}: Setting discharge to {pwr}W (currently: {current_discharge}W, limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
+                    actual_pwr = await d.power_discharge(pwr)
+                    # Reduce setpoint by the DIFFERENCE (how much more we got)
+                    # If device was at 300W and we set 400W, we got 100W more
+                    additional = actual_pwr - current_discharge if actual_pwr > current_discharge else actual_pwr
+                    setpoint = max(0, setpoint - additional)
+                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (additional: {additional}W, remaining setpoint: {setpoint}W)")
                 else:
                     await d.power_discharge(0)
             elif average > d.pwr_load or isFirst:
