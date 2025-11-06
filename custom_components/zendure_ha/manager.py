@@ -1077,8 +1077,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.debugP1Sensor.update_value(f"P1={p1}W setpoint={pwr_setpoint}W @ {timestamp}")
         
+        # Calculate what we need: setpoint is TOTAL discharge needed
+        # If devices already discharge total_home_output, we need (setpoint - total_home_output) more
+        # But actually, setpoint already accounts for this, so we just need to reach setpoint total
+        additional_needed = pwr_setpoint - total_home_output if pwr_setpoint > total_home_output else 0
+        
         # Update power distribution.
-        _LOGGER.info(f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W")
+        _LOGGER.info(f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W, current_total:{total_home_output}W, additional_needed:{additional_needed}W, produced:{pwr_produced}W")
+        print(f"[ZENDURE] P1={p1}W setpoint={pwr_setpoint}W current={total_home_output}W additional={additional_needed}W")
         match self.operation:
             case SmartMode.MATCHING:
                 if pwr_setpoint >= 0:
@@ -1176,11 +1182,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # This helps when Wärmepumpe/Backofen suddenly starts
         is_large_setpoint = setpoint > SmartMode.LARGE_CHANGE_THRESHOLD
         
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, current total: {current_total_discharge}W, available {self.pwr_total}W, devices {self.pwr_count}, large_setpoint={is_large_setpoint}")
+        # IMPORTANT: setpoint is the TARGET TOTAL discharge we want
+        # If devices already discharge current_total_discharge, we need (setpoint - current_total_discharge) more
+        # But we track remaining_setpoint as the TOTAL we still need to achieve
+        # So we start with the full setpoint and reduce by what we actually get
+        additional_needed = setpoint - current_total_discharge if setpoint > current_total_discharge else 0
+        
+        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W (TARGET TOTAL), current total: {current_total_discharge}W, additional needed: {additional_needed}W, available {self.pwr_total}W, devices {self.pwr_count}, large_setpoint={is_large_setpoint}")
 
         # distribute the power over the devices
         isFirst = True
-        remaining_setpoint = setpoint  # Track remaining setpoint
+        # Track how much TOTAL discharge we still need (not additional)
+        # We'll reduce this by the actual discharge we get from each device
+        remaining_setpoint = setpoint  # This is the TARGET TOTAL we want to achieve
         
         for d in devices:
             if d.state == DeviceState.SOCEMPTY:
@@ -1209,14 +1223,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     pwr = min(remaining_setpoint, d.limitDischarge)
 
                 if pwr > 0:
-                    # pwr is the TOTAL discharge we want from this device
+                    # pwr is the TARGET TOTAL discharge we want from this device
                     current_discharge = d.homeOutput.asInt if d.homeOutput.asInt > 0 else 0
                     _LOGGER.info(f"  → {d.name}: Setting discharge to {pwr}W (currently: {current_discharge}W, limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
                     actual_pwr = await d.power_discharge(pwr)
-                    # Reduce remaining_setpoint by what we actually got (not just additional)
-                    # This ensures we track total discharge correctly
-                    remaining_setpoint = max(0, remaining_setpoint - actual_pwr)
-                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (remaining setpoint: {remaining_setpoint}W)")
+                    # Reduce remaining_setpoint by the INCREASE we got
+                    # If device was at 300W and now at 400W, we got 100W more
+                    # remaining_setpoint tracks how much TOTAL we still need
+                    # So we reduce by the actual_pwr (the new total from this device)
+                    # But we need to account for what it was already doing
+                    increase = actual_pwr - current_discharge if actual_pwr > current_discharge else 0
+                    remaining_setpoint = max(0, remaining_setpoint - increase)
+                    _LOGGER.info(f"  → {d.name}: Actually discharging {actual_pwr}W (was {current_discharge}W, increase: {increase}W, remaining setpoint: {remaining_setpoint}W)")
                 else:
                     # If pwr <= 0, turn off this device
                     await d.power_discharge(0)
@@ -1227,6 +1245,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             average -= d.pwr_load
             isFirst = False
 
-        # Distribution done, remaining power should be zero
+        # Distribution done, check if we reached the target
+        final_total_discharge = sum(d.homeOutput.asInt for d in devices if d.homeOutput.asInt > 0)
+        setpoint_achieved = abs(final_total_discharge - (setpoint + current_total_discharge - setpoint)) < 100  # Allow 100W tolerance
+        
         if remaining_setpoint != 0:
             _LOGGER.warning(f"powerDistribution => left {remaining_setpoint}W (devices may be at limit or offline)")
+            _LOGGER.warning(f"powerDistribution => final_total:{final_total_discharge}W, target:{setpoint}W, gap:{setpoint - final_total_discharge}W")
+            print(f"[ZENDURE] WARNING: Setpoint not fully met! Target={setpoint}W, Actual={final_total_discharge}W, Gap={setpoint - final_total_discharge}W")
+        else:
+            _LOGGER.info(f"powerDistribution => SUCCESS! Target={setpoint}W, Final={final_total_discharge}W")
+            print(f"[ZENDURE] Setpoint achieved! Target={setpoint}W, Final={final_total_discharge}W")
