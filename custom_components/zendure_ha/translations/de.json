@@ -305,6 +305,12 @@
       "next_calibration": {
         "name": "Nächste Kalibrierung"
       },
+      "device_action": {
+        "name": "Geräte-Aktion (Debug)"
+      },
+      "last_power_command": {
+        "name": "Letzter Befehl (Debug)"
+      },
       "calibration_status": {
         "name": "Kalibrierungs-Status"
       },

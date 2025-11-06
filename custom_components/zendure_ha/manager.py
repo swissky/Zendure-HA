@@ -833,7 +833,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if self.operation == SmartMode.GRID_CHARGING:
             # Use grid_charge_power as TOTAL limit for all devices
             total_grid_power = self.config_entry.data.get(CONF_GRID_CHARGE_POWER, GridChargingDefaults.POWER)
-            _LOGGER.info(f"Grid Charging Mode: Charging with TOTAL {total_grid_power}W distributed across devices (ignoring P1={p1}W)")
             
             # Update sensors
             self.power.update_value(pwr_home + pwr_produced)
@@ -845,15 +844,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if non_full_devices:
                 # Distribute evenly (simple approach)
                 power_per_device = total_grid_power // len(non_full_devices)
-                _LOGGER.info(f"Distributing {total_grid_power}W across {len(non_full_devices)} devices = {power_per_device}W each")
+                
+                _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
+                _LOGGER.info(f"Total Power: {total_grid_power}W | Non-full devices: {len(non_full_devices)} | Per device: {power_per_device}W")
+                _LOGGER.info(f"Ignoring P1 meter (currently: {p1}W)")
                 
                 for device in devices:
                     if device.state != DeviceState.SOCFULL:
+                        _LOGGER.info(f"  → {device.name}: Charging with {power_per_device}W (SoC: {device.electricLevel.asInt}%)")
                         await device.power_charge(-power_per_device)
                     else:
+                        _LOGGER.info(f"  → {device.name}: FULL (SoC: {device.electricLevel.asInt}%) - skipping")
                         await device.power_off()
             else:
-                _LOGGER.info("All devices full, stopping grid charging")
+                _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
+                _LOGGER.info("All {len(devices)} devices are FULL - stopping grid charging")
                 for device in devices:
                     await device.power_off()
             
