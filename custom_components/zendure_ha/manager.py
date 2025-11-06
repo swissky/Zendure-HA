@@ -905,6 +905,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 pwr_home += d.pwr_home
                 pwr_produced += d.pwr_produced
                 devices.append(d)
+        
+        # Update aggregate sensors BEFORE calculating setpoint
+        # This ensures totalHomeOutput has the latest values
+        self._update_aggregate_sensors()
 
         # SPECIAL CASE: Grid Charging Mode ignores P1 meter completely!
         if self.operation == SmartMode.GRID_CHARGING:
@@ -959,10 +963,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return  # DONE - don't process P1 meter!
         
         # Get the setpoint (only for non-grid-charging modes)
+        # Use totalHomeOutput sensor value (actual current output from all devices)
+        # instead of calculated pwr_home for more accurate setpoint
         # pwr_setpoint = total discharge needed to make P1 = 0
-        # If pwr_home = 1465W (already discharging) and p1 = 263W (import),
+        # If totalHomeOutput = 1465W (actual output) and p1 = 263W (import),
         # then setpoint = 1465 + 263 = 1728W (total needed)
-        pwr_setpoint = pwr_home + p1
+        total_home_output = int(self.totalHomeOutput.asNumber) if hasattr(self, 'totalHomeOutput') else pwr_home
+        pwr_setpoint = total_home_output + p1
         if issurplus := self.operation == SmartMode.MATCHING and pwr_setpoint > 0 and abs(pwr_bypass) > pwr_setpoint:
             pwr_setpoint += pwr_bypass
         elif pwr_setpoint < 0 and pwr_setpoint < pwr_produced + pwr_bypass:
