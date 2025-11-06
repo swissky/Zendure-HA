@@ -863,7 +863,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 for device in devices:
                     if device.state != DeviceState.SOCFULL:
                         _LOGGER.info(f"  → {device.name}: Charging with {power_per_device}W (SoC: {device.electricLevel.asInt}%)")
-                        await device.power_charge(-power_per_device)
+                        # Force=True to skip delta check (devices might already charge from panels)
+                        if hasattr(device.power_charge, '__code__') and 'force' in device.power_charge.__code__.co_varnames:
+                            await device.power_charge(-power_per_device, force=True)
+                        else:
+                            await device.power_charge(-power_per_device)
                     else:
                         _LOGGER.info(f"  → {device.name}: FULL (SoC: {device.electricLevel.asInt}%) - skipping")
                         await device.power_off()

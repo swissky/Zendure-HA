@@ -28,14 +28,19 @@ class Hyper2000(ZendureLegacy):
         """Get the offgrid power."""
         return self.offGrid.asInt
 
-    async def power_charge(self, power: int) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= 1:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
+    async def power_charge(self, power: int, force: bool = False) -> int:
+        """Set charge power.
+        
+        Args:
+            power: Power to charge (negative value)
+            force: Skip delta check (for grid charging)
+        """
+        if not force and abs(power - self.pwr_home) <= 1:
+            _LOGGER.info(f"Power charge {self.name} => no action [power {power}, delta too small]")
             self.deviceAction.update_value("Standby (kein Delta)")
             return power
 
-        _LOGGER.info(f"Power charge {self.name} => {power} (Setting acMode=1, inputLimit={abs(power)})")
+        _LOGGER.info(f"Power charge {self.name} => {power} (Setting acMode=1, inputLimit={abs(power)}, force={force})")
         
         # Update debug sensors
         self.deviceAction.update_value(f"Laden vom Netz")
