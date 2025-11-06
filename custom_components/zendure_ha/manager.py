@@ -487,7 +487,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.totalHomeOutput.update_value(total_home_output)
         self.totalGridInput.update_value(total_grid_input)
         
-        _LOGGER.info(f"Aggregates: Solar={total_solar}W, Available={total_available:.1f}/{total_capacity:.1f}kWh ({total_soc:.0f}%), Home={total_home_output}W, Grid={total_grid_input}W")
+        # FORCE visible aggregate logs
+        agg_msg = f"Aggregates: Solar={total_solar}W, Available={total_available:.1f}/{total_capacity:.1f}kWh ({total_soc:.0f}%), Home={total_home_output}W, Grid={total_grid_input}W"
+        _LOGGER.info(agg_msg)
+        print(f"[ZENDURE] {agg_msg}")
 
     def _update_calibration_status(self) -> None:
         """Update the calibration status display sensors."""
@@ -856,6 +859,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # Distribute evenly (simple approach)
                 power_per_device = total_grid_power // len(non_full_devices)
                 
+                # FORCE visible logs
+                print(f"[ZENDURE] ═══ GRID CHARGING MODE ═══")
+                print(f"[ZENDURE] Total Power: {total_grid_power}W | Non-full devices: {len(non_full_devices)} | Per device: {power_per_device}W")
                 _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
                 _LOGGER.info(f"Total Power: {total_grid_power}W | Non-full devices: {len(non_full_devices)} | Per device: {power_per_device}W")
                 _LOGGER.info(f"Ignoring P1 meter (currently: {p1}W)")
@@ -935,7 +941,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.last_mode_change = time
 
         # Update power distribution.
-        _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W")
+        # FORCE visible log with print fallback
+        log_msg = f"P1 ======> p1:{p1}W isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W"
+        _LOGGER.info(log_msg)
+        print(f"[ZENDURE] {log_msg}")  # Fallback to ensure visibility
         match self.operation:
             case SmartMode.MATCHING:
                 if pwr_setpoint >= 0:
