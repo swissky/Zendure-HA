@@ -915,35 +915,46 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.power.update_value(pwr_home + pwr_produced)
             self.availableKwh.update_value(availEnergy)
             
-            # Distribute total power across non-full devices
-            non_full_devices = [d for d in devices if d.state != DeviceState.SOCFULL]
+            # Distribute total power across non-full ONLINE devices
+            # Include all devices that are not FULL, even if they have no solar (like SolarFlow 2400 without panels)
+            non_full_devices = [d for d in devices if d.state != DeviceState.SOCFULL and d.online]
+            
+            # Update DEBUG sensors (also for Grid Charging)
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            self.debugP1Sensor.update_value(f"P1={p1}W (Grid Charging Mode) @ {timestamp}")
             
             if non_full_devices:
                 # Distribute evenly (simple approach)
                 power_per_device = total_grid_power // len(non_full_devices)
                 
                 # Update DEBUG sensor
-                timestamp = datetime.now().strftime("%H:%M:%S")
                 self.debugGridCharging.update_value(f"{total_grid_power}W → {len(non_full_devices)} Geräte ({power_per_device}W each) @ {timestamp}")
                 
                 _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
                 _LOGGER.info(f"Total Power: {total_grid_power}W | Non-full devices: {len(non_full_devices)} | Per device: {power_per_device}W")
                 _LOGGER.info(f"Ignoring P1 meter (currently: {p1}W)")
                 
-                for device in devices:
-                    if device.state != DeviceState.SOCFULL:
-                        _LOGGER.info(f"  → {device.name}: Charging with {power_per_device}W (SoC: {device.electricLevel.asInt}%)")
-                        # Force=True to skip delta check (devices might already charge from panels)
-                        if hasattr(device.power_charge, '__code__') and 'force' in device.power_charge.__code__.co_varnames:
-                            await device.power_charge(-power_per_device, force=True)
-                        else:
-                            await device.power_charge(-power_per_device)
+                # Iterate over non_full_devices (not all devices!)
+                for device in non_full_devices:
+                    _LOGGER.info(f"  → {device.name}: Charging with {power_per_device}W (SoC: {device.electricLevel.asInt}%, Online: {device.online})")
+                    # Force=True to skip delta check (devices might already charge from panels or have no solar)
+                    if hasattr(device.power_charge, '__code__') and 'force' in device.power_charge.__code__.co_varnames:
+                        await device.power_charge(-power_per_device, force=True)
                     else:
-                        _LOGGER.info(f"  → {device.name}: FULL (SoC: {device.electricLevel.asInt}%) - skipping")
+                        await device.power_charge(-power_per_device)
+                
+                # Turn off FULL or OFFLINE devices
+                for device in devices:
+                    if device not in non_full_devices:
+                        if device.state == DeviceState.SOCFULL:
+                            _LOGGER.info(f"  → {device.name}: FULL (SoC: {device.electricLevel.asInt}%) - skipping")
+                        elif not device.online:
+                            _LOGGER.info(f"  → {device.name}: OFFLINE - skipping")
                         await device.power_off()
             else:
                 _LOGGER.info(f"═══ GRID CHARGING MODE ═══")
-                _LOGGER.info("All {len(devices)} devices are FULL - stopping grid charging")
+                _LOGGER.info(f"All {len(devices)} devices are FULL or OFFLINE - stopping grid charging")
+                self.debugGridCharging.update_value(f"Keine Geräte verfügbar (alle voll/offline) @ {timestamp}")
                 for device in devices:
                     await device.power_off()
             
