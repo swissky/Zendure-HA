@@ -965,11 +965,17 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Get the setpoint (only for non-grid-charging modes)
         # Use totalHomeOutput sensor value (actual current output from all devices)
         # instead of calculated pwr_home for more accurate setpoint
+        # 
+        # P1 SENSOR INTERPRETATION (user-defined):
+        # - Positive P1 = Import from grid (need to discharge more to compensate)
+        # - Negative P1 = Export to grid (need to discharge less or charge)
+        # 
+        # Setpoint calculation:
         # pwr_setpoint = total discharge needed to make P1 = 0
         # If totalHomeOutput = 1465W (actual output) and p1 = 263W (import),
-        # then setpoint = 1465 + 263 = 1728W (total needed)
+        # then setpoint = 1465 + 263 = 1728W (total needed to eliminate import)
         total_home_output = int(self.totalHomeOutput.asNumber) if hasattr(self, 'totalHomeOutput') else pwr_home
-        pwr_setpoint = total_home_output + p1
+        pwr_setpoint = total_home_output + p1  # Add P1 to compensate (if P1 is import, we need more discharge)
         if issurplus := self.operation == SmartMode.MATCHING and pwr_setpoint > 0 and abs(pwr_bypass) > pwr_setpoint:
             pwr_setpoint += pwr_bypass
         elif pwr_setpoint < 0 and pwr_setpoint < pwr_produced + pwr_bypass:
