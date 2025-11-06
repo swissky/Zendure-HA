@@ -1100,41 +1100,49 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if d.state == DeviceState.SOCEMPTY:
                 return 101
             d.pwr_load = d.limitDischarge // 4
-            if d.homeOutput.asInt > 0:
+            # Count ALL online devices that can discharge (not just those currently discharging)
+            if d.online and d.state != DeviceState.SOCEMPTY and d.state != DeviceState.SOCFULL:
                 self.pwr_count += 1
-                self.pwr_total += d.fuseGrp.dischargePower(d, self.pwr_update)
+                # Use limitDischarge as available capacity (not just current output)
+                self.pwr_total += d.limitDischarge
             return d.electricLevel.asInt + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
 
         devices.sort(key=sortDischarge, reverse=True)
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint} cnt {self.pwr_count}")
+        _LOGGER.info(f"powerDischarge => setpoint {setpoint}W, available {self.pwr_total}W, devices {self.pwr_count}")
 
         # distribute the power over the devices
         isFirst = True
-        setpoint = min(setpoint, self.pwr_total)
+        # Don't limit setpoint - we want to reach the target!
+        # setpoint = min(setpoint, self.pwr_total)  # REMOVED - was preventing proper discharge
+        
         for d in devices:
             if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(-d.pwr_produced)
-            else:
-                if d.homeOutput.asInt > 0 and setpoint > 0:
-                    if self.pwr_count > 1 and setpoint > d.pwr_load and self.pwr_total > 0:
-                        pct = min(1, max(0.125, setpoint / self.pwr_total))
-                        pct = pct if pct < 0.25 or pct > 0.8 else min(0.9, pct + self.pwr_count * 0.05)
-                        pwr = min(int(pct * d.maxPower), setpoint)
-                        self.pwr_count -= 1
-                        self.pwr_total -= d.maxPower
-                    else:
-                        pwr = setpoint
+            elif d.online and d.state != DeviceState.SOCFULL and setpoint > 0:
+                # Calculate power for this device based on available capacity
+                if self.pwr_count > 1 and self.pwr_total > 0:
+                    # Distribute proportionally based on limitDischarge
+                    pct = d.limitDischarge / self.pwr_total if self.pwr_total > 0 else 1.0 / self.pwr_count
+                    pwr = min(int(setpoint * pct), d.limitDischarge, setpoint)
+                    self.pwr_count -= 1
+                    self.pwr_total -= d.limitDischarge
+                else:
+                    # Single device or last device - give it all remaining power
+                    pwr = min(setpoint, d.limitDischarge)
 
+                if pwr > 0:
+                    _LOGGER.info(f"  → {d.name}: Discharging {pwr}W (limit: {d.limitDischarge}W, SoC: {d.electricLevel.asInt}%)")
                     pwr = await d.power_discharge(pwr)
                     setpoint = max(0, setpoint - pwr)
-
-                elif average > d.pwr_load or isFirst:
-                    await d.power_discharge(SmartMode.STARTWATT)
                 else:
                     await d.power_discharge(0)
-                average -= d.pwr_load
-                isFirst = False
+            elif average > d.pwr_load or isFirst:
+                await d.power_discharge(SmartMode.STARTWATT)
+            else:
+                await d.power_discharge(0)
+            average -= d.pwr_load
+            isFirst = False
 
         # Distribution done, remaining power should be zero
         if setpoint != 0:
-            _LOGGER.info(f"powerDistribution => left {setpoint}W")
+            _LOGGER.warning(f"powerDistribution => left {setpoint}W (devices may be at limit or offline)")
