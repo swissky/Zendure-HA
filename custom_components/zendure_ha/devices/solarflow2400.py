@@ -18,7 +18,7 @@ class SolarFlow2400AC_Plus(ZendureZenSdk):
         self.setLimits(-3200, 2400)
         self.maxSolar = -2400
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
-        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPower", None, "kWh", "energy", "total", 2)
+        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPower", None, "kWh", "energy", "total_increasing", 2)
 
     @property
     def pwr_offgrid(self) -> int:
@@ -33,7 +33,7 @@ class SolarFlow2400AC(ZendureZenSdk):
         self.setLimits(-2400, 2400)
         self.maxSolar = -2400
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
-        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPower", None, "kWh", "energy", "total", 2)
+        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPower", None, "kWh", "energy", "total_increasing", 2)
 
     @property
     def pwr_offgrid(self) -> int:
@@ -48,7 +48,7 @@ class SolarFlow2400Pro(ZendureZenSdk):
         self.setLimits(-3200, 2400)
         self.maxSolar = -3000
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
-        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPower", None, "kWh", "energy", "total", 2)
+        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPower", None, "kWh", "energy", "total_increasing", 2)
 
     @property
     def pwr_offgrid(self) -> int:

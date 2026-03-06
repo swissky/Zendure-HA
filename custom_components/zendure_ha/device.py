@@ -135,8 +135,9 @@ class ZendureDevice(EntityDevice):
         self.batInOut = ZendureSensor(self, "batInOut", None, "W", "power", "measurement", 0)
         self.heatState = ZendureBinarySensor(self, "heatState")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
-        self.hemsStateUpdate = datetime.min
-        self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
+        self.hemsStateUpdated = datetime.min
+        self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", "measurement", 1)
+        self.totalKwh = ZendureSensor(self, "total_kwh", None, "kWh", "energy", "measurement", 2)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
@@ -214,7 +215,8 @@ class ZendureDevice(EntityDevice):
                     case "outputHomePower":
                         self.aggrHomeOut.aggregate(dt_util.now(), value)
                     case "gridOffPower":
-                        self.aggrOffGrid.aggregate(dt_util.now(), value)
+                        if hasattr(self, "aggrOffGrid"):
+                            self.aggrOffGrid.aggregate(dt_util.now(), value)
                     case "inverseMaxPower":
                         self.setLimits(self.charge_limit, value)
                     case "chargeLimit" | "chargeMaxLimit":
@@ -226,7 +228,7 @@ class ZendureDevice(EntityDevice):
                     case "electricLevel" | "minSoc" | "socLimit":
                         if self.electricLevel.asInt == 100:
                             self.nextCalibration.update_value(dt_util.now() + timedelta(days=30))
-                        self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
+                        self.availableKwh.update_value(max(0.0, (self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh))
         except Exception as e:
             _LOGGER.error(f"EntityUpdate error {self.name} {key} {e}!")
             _LOGGER.error(traceback.format_exc())
@@ -307,14 +309,19 @@ class ZendureDevice(EntityDevice):
                     continue
 
                 if (bat := self.batteries.get(sn, None)) is None:
-                    self.batteries[sn] = ZendureBattery(self.hass, sn, self)
-                    self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
-                    self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
+                    bat = ZendureBattery(self.hass, sn, self)
+                    self.batteries[sn] = bat
 
-                elif bat and b:
+                if bat and b:
                     for key, value in b.items():
                         if key != "sn":
                             bat.entityUpdate(key, value)
+
+            # Recalculate total capacity after every packData update
+            # (covers both new batteries and potential pack changes)
+            self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
+            self.totalKwh.update_value(self.kWh)
+            self.availableKwh.update_value(max(0.0, (self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh))
 
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         try:
