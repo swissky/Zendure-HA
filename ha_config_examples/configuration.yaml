@@ -1,0 +1,157 @@
+# ============================================================
+# Zendure HA - Multi-Device Configuration Example
+# Tested with: zendure_ha integration (swissky/Zendure-HA fork)
+# Setup: 2x Hyper 2000 + SolarFlow 800 Pro + SF2400 AC + SF2400 Pro
+# Smart Meter: gPlugD (Z-Welle)
+# ============================================================
+
+# ============================================
+# Integration Sensors
+# Converts live power (W) to energy (kWh)
+# Requires template sensors below to be defined first
+# ============================================
+sensor:
+  # Total battery discharge to house -> kWh (daily via utility_meter)
+  - platform: integration
+    source: sensor.zendure_output_home_power_total
+    name: "Zendure Batterie Entladung an Haus"
+    unique_id: zendure_batterie_entladung_an_haus
+    unit_prefix: k
+    round: 3
+    method: left
+    unit_time: h
+
+  # Total solar charging power -> kWh
+  - platform: integration
+    source: sensor.zendure_pack_input_power_total
+    name: "Zendure Solarstrom in Batterie"
+    unique_id: zendure_solarstrom_in_batterie
+    unit_prefix: k
+    round: 3
+    method: left
+    unit_time: h
+
+  # Total solar production -> kWh (trapezoidal for higher accuracy)
+  - platform: integration
+    source: sensor.zendure_solar_input_power_total
+    name: "Zendure Solarenergie gesamt"
+    unique_id: zendure_solarenergie_gesamt
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+    unit_time: h
+
+# ============================================
+# Template Sensors
+# Adjust entity IDs to match your device serial numbers:
+#   hyper2000_618 -> your Hyper2000 (serial 618...)
+#   hyper2000_220 -> your second Hyper2000
+#   sf800pro_589  -> SolarFlow 800 Pro
+#   sf2400ac_296  -> SolarFlow 2400 AC
+#   sf2400pro_067 -> SolarFlow 2400 Pro
+# ============================================
+template:
+  - sensor:
+      # --------------------------------------------------
+      # Total available battery energy (kWh, all devices)
+      # --------------------------------------------------
+      - name: "Zendure Batterie Energieinhalt"
+        unique_id: zendure_batterie_energieinhalt
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: measurement
+        state: >
+          {{ (
+            states('sensor.hyper2000_618_available_kwh') | float(0) +
+            states('sensor.hyper2000_220_available_kwh') | float(0) +
+            states('sensor.hyper2000_234_available_kwh') | float(0) +
+            states('sensor.sf800pro_589_available_kwh') | float(0) +
+            states('sensor.sf2400ac_296_available_kwh') | float(0) +
+            states('sensor.sf2400pro_067_available_kwh') | float(0)
+          ) | round(2) }}
+
+      # --------------------------------------------------
+      # Total solar input power (W, all devices, no negatives)
+      # Use [value, 0] | max pattern - NOT | max(0) (invalid in Jinja2)
+      # --------------------------------------------------
+      - name: "Zendure Solar Input Power Total"
+        unique_id: zendure_solar_input_power_total
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set pv1 = states('sensor.hyper2000_618_solar_input_power') | float(0) %}
+          {% set pv2 = states('sensor.hyper2000_220_solar_input_power') | float(0) %}
+          {% set pv3 = states('sensor.hyper2000_234_solar_input_power') | float(0) %}
+          {% set pv4 = states('sensor.sf800pro_589_solar_input_power') | float(0) %}
+          {% set pv5 = states('sensor.sf2400ac_296_solar_input_power') | float(0) %}
+          {% set pv6 = states('sensor.sf2400pro_067_solar_input_power') | float(0) %}
+          {{ ([pv1, 0] | max + [pv2, 0] | max + [pv3, 0] | max +
+              [pv4, 0] | max + [pv5, 0] | max + [pv6, 0] | max) | round(0) }}
+
+      # --------------------------------------------------
+      # Total battery charge power (W, from solar into battery)
+      # --------------------------------------------------
+      - name: "Zendure Pack Input Power Total"
+        unique_id: zendure_pack_input_power_total
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {{ (
+            states('sensor.hyper2000_618_pack_input_power') | float(0) +
+            states('sensor.hyper2000_220_pack_input_power') | float(0) +
+            states('sensor.hyper2000_234_pack_input_power') | float(0) +
+            states('sensor.sf800pro_589_pack_input_power') | float(0) +
+            states('sensor.sf2400ac_296_pack_input_power') | float(0) +
+            states('sensor.sf2400pro_067_pack_input_power') | float(0)
+          ) | round(0) }}
+
+      # --------------------------------------------------
+      # Total output to house (W, from battery to home)
+      # --------------------------------------------------
+      - name: "Zendure Output Home Power Total"
+        unique_id: zendure_output_home_power_total
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {{ (
+            states('sensor.hyper2000_618_output_home_power') | float(0) +
+            states('sensor.hyper2000_220_output_home_power') | float(0) +
+            states('sensor.hyper2000_234_output_home_power') | float(0) +
+            states('sensor.sf800pro_589_output_home_power') | float(0) +
+            states('sensor.sf2400ac_296_output_home_power') | float(0) +
+            states('sensor.sf2400pro_067_output_home_power') | float(0)
+          ) | round(0) }}
+
+      # --------------------------------------------------
+      # Grid power (kW): positive = import, negative = export
+      # Source: gPlugD smart meter
+      # --------------------------------------------------
+      - name: "Netz Leistung Gesamt"
+        unique_id: gplugd_netz_leistung_gesamt
+        unit_of_measurement: "kW"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set pi = states('sensor.gplugd_z_pi') | float(0) %}
+          {% set po = states('sensor.gplugd_z_po') | float(0) %}
+          {{ (pi - po) | round(3) }}
+        availability: >
+          {{ states('sensor.gplugd_z_pi') not in ['unavailable', 'unknown']
+             and states('sensor.gplugd_z_po') not in ['unavailable', 'unknown'] }}
+
+# ============================================
+# Utility Meter - Daily reset counters
+# ============================================
+utility_meter:
+  zendure_solarenergie_heute:
+    name: "Zendure Solarenergie heute"
+    source: sensor.zendure_solarenergie_gesamt
+    cycle: daily
+
+  zendure_entladung_heute:
+    name: "Zendure Entladung heute"
+    source: sensor.zendure_batterie_entladung_an_haus
+    cycle: daily
